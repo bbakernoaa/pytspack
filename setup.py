@@ -2,7 +2,13 @@ from setuptools import setup, Extension
 
 ext = Extension(
     name="pytspack.tspack",
-    sources=["pytspack/tspack.c"],
+    sources=[
+        "pytspack/tspack.c",
+        "pytspack/tripack.c",
+        "pytspack/stripack.c",
+        "pytspack/srfpack.c",
+        "pytspack/ssrfpack.c",
+    ],
 )
 
 if __name__ == "__main__":

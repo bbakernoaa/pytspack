@@ -15,7 +15,7 @@ void fval(double xp, double yp, double x1, double x2, double x3, double y1, doub
 void getsig(int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, double tol, double* sigma, double* dsmax, int* ier);
 void givens(double a, double b, double* c, double* s);
 void gradc(int k, int ncc, int* lcc, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, double* dx, double* dy, double* dxx, double* dxy, double* dyy, int* ier);
-void gradg(int ncc, int* lcc, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, int iflgs, double* sigma, int nit, double* dgmax, double* grad, int* ier);
+void gradg(int ncc, int* lcc, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, int iflgs, double* sigma, int* nit, double* dgmax, double* grad, int* ier);
 void gradl(int k, int ncc, int* lcc, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, double* dx, double* dy, int* ier);
 void grcoef(double sigma, double dcub, double* d, double* sd);
 void intrc0(double px, double py, int ncc, int* lcc, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, int* ist, double* pz, int* ier);
@@ -28,14 +28,14 @@ void sgprnt(int n, int lunit, int* list, int* lptr, int* lend, double* sigma);
 double sig0(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, int iflgb, double hbnd, double tol, int iflgs, double* sigma, int* ier);
 double sig1(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, int iflgb, double hpbnd, double tol, int iflgs, double* sigma, int* ier);
 double sig2(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, double tol, int iflgs, double* sigma, int* ier);
-void smsgs(int ncc, int* lcc, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, int iflgs, double* sigma, double* w, double p, int nit, double dfmax, double* f, double* fxfy, int* ier);
+void smsgs(int ncc, int* lcc, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, int iflgs, double* sigma, double* w, double p, int* nit, double dfmax, double* f, double* fxfy, int* ier);
 void smsurf(int ncc, int* lcc, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, int iflgs, double* sigma, double* w, double sm, double smtol, double gstol, int lprnt, double* f, double* fxfy, int* ier);
 void snhcsh(double x, double* sinhm, double* coshm, double* coshmm);
 double trvol(double x1, double x2, double x3, double y1, double y2, double y3, double z1, double z2, double z3);
 void tval(double x, double y, double x1, double x2, double x3, double y1, double y2, double y3, double z1, double z2, double z3, double zx1, double zx2, double zx3, double zy1, double zy2, double zy3, int dflag, double* f, double* fx, double* fy, int* ier);
 void unif(int ncc, int* lcc, int n, double* x, double* y, double* z, double* grad, int* list, int* lptr, int* lend, int iflgs, double* sigma, int nrow, int nx, int ny, double* px, double* py, int sflag, double sval, double* zz, int* ier);
 double volume(int ncc, int* lcc, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend);
-void zgradg(int ncc, int* lcc, int n, double* x, double* y, int* list, int* lptr, int* lend, int iflgs, double* sigma, int nit, double dzmax, double* z, double* grad, int* ier);
+void zgradg(int ncc, int* lcc, int n, double* x, double* y, int* list, int* lptr, int* lend, int iflgs, double* sigma, int* nit, double dzmax, double* z, double* grad, int* ier);
 void zgradl(int k, int ncc, int* lcc, int n, double* x, double* y, int* list, int* lptr, int* lend, int ndv, double* z, int* npts, double* ds, double* dx, double* dy, int* ier);
 void zinit(int ncc, int* lcc, int n, double* x, double* y, int* list, int* lptr, int* lend, double* z, int* ier);
 

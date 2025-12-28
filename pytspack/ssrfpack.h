@@ -15,7 +15,7 @@ void ssrf_constr(double xk, double yk, double zk, double* cx, double* sx, double
 double ssrf_fval(double b1, double b2, double b3, double* v1, double* v2, double* v3, double f1, double f2, double f3, double* g1, double* g2, double* g3, double sig1, double sig2, double sig3);
 void ssrf_getsig(int n, double* x, double* y, double* z, double* h, int* list, int* lptr, int* lend, double* grad, double tol, double* sigma, double* dsmax, int* ier);
 void ssrf_givens(double a, double b, double* c, double* s);
-void ssrf_gradg(int n, double* x, double* y, double* z, double* f, int* list, int* lptr, int* lend, int iflgs, double* sigma, int nit, double* dgmax, double* grad, int* ier);
+void ssrf_gradg(int n, double* x, double* y, double* z, double* f, int* list, int* lptr, int* lend, int iflgs, double* sigma, int* nit, double* dgmax, double* grad, int* ier);
 void ssrf_gradl(int n, int k, double* x, double* y, double* z, double* w, int* list, int* lptr, int* lend, double* g, int* ier);
 void ssrf_grcoef(double sigma, double* d, double* sd);
 double ssrf_hval(double b, double h1, double h2, double hp1, double hp2, double sigma);
@@ -27,13 +27,10 @@ void ssrf_sgprnt(int n, int lunit, int* list, int* lptr, int* lend, double* sigm
 double ssrf_sig0(int n1, int n2, int n, double* x, double* y, double* z, double* h, int* list, int* lptr, int* lend, double* grad, int iflgb, double hbnd, double tol, int iflgs, double* sigma, int* ier);
 double ssrf_sig1(int n1, int n2, int n, double* x, double* y, double* z, double* h, int* list, int* lptr, int* lend, double* grad, int iflgb, double hpbnd, double tol, int iflgs, double* sigma, int* ier);
 double ssrf_sig2(int n1, int n2, int n, double* x, double* y, double* z, double* h, int* list, int* lptr, int* lend, double* grad, double tol, int iflgs, double* sigma, int* ier);
-void ssrf_smsgs(int n, double* x, double* y, double* z, double* u, int* list, int* lptr, int* lend, int iflgs, double* sigma, double* w, double p, int nit, double dfmax, double* f, double* grad, int* ier);
+void ssrf_smsgs(int n, double* x, double* y, double* z, double* u, int* list, int* lptr, int* lend, int iflgs, double* sigma, double* w, double p, int* nit, double dfmax, double* f, double* grad, int* ier);
 void ssrf_smsurf(int n, double* x, double* y, double* z, double* u, int* list, int* lptr, int* lend, int iflgs, double* sigma, double* w, double sm, double smtol, double gstol, int lprnt, double* f, double* grad, int* ier);
 void ssrf_snhcsh(double x, double* sinhm, double* coshm, double* coshmm);
 void ssrf_unif(int n, double* x, double* y, double* z, double* f, int* list, int* lptr, int* lend, int iflgs, double* sigma, int nrow, int ni, int nj, double* plat, double* plon, int iflgg, double* grad, double* ff, int* ier);
-void ssrf_wval(double b1, double b2, double b3, double* v1, double* v2, double* v3, double w1, double w2, double w3, double* g1, double* g2, double* g3, int iflag, double* pw, double* pg);
-void ssrf_shiftd(int nfrst, int nlast, int kk, int* iarr);
-void interp_n(int npts, int nptso, int order, double* olats, double* olons, double* x, double* y, double* z, double* datain, int* lst, int* lptr, int* lend, double* odata, int* edata, int* ierr);
 
 #ifdef __cplusplus
 }
