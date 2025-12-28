@@ -1,17 +1,15 @@
-from numpy.distutils.core import Extension
+from setuptools import setup, Extension
 
 ext = Extension(
-    name="tspack",
-    sources=["pytspack/tspack.pyf", "pytspack/tspack.f"],
+    name="pytspack.tspack",
+    sources=["pytspack/tspack.c"],
 )
 
 if __name__ == "__main__":
-    from numpy.distutils.core import setup
-
     setup(
         name="pytspack",
-        version="0.1.3",
-        description="Wrapper around Robert J. Renka's fortran TSPACK: Tension Spline Curve Fitting Package",
+        version="0.2.0",
+        description="Wrapper around Robert J. Renka's C-translated TSPACK: Tension Spline Curve Fitting Package",
         author="Barry D. Baker",
         license="MIT",
         author_email="barry.baker@noaa.gov",
