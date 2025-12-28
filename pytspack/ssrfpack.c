@@ -38,6 +38,39 @@ static void ssrf_setup(float xi, float yi, float wi, float wk,
     row[5] = (wi - wk)*wt;
 }
 
+/* Interpolate at a list of N_TARGETS arbitrary points */
+void ssrf_interp_points(int n, float *x, float *y, float *z, float *f,
+                        int *list, int *lptr, int *lend,
+                        int iflgs, float *sigma,
+                        int n_targets, float *t_lats, float *t_lons,
+                        int iflgg, float *grad, float *out_vals, int *ier) {
+    
+    int ist = 1; // Starting search index hint
+    int err_count = 0;
+    
+    // Precompute gradients if requested (iflgg==2) is handled by caller usually,
+    // but here we assume grad is populated or computed on fly (iflgg=0/1).
+    
+    for(int k = 0; k < n_targets; k++) {
+        float val;
+        int local_ier;
+        
+        // Call the single-point interpolator
+        // Note: passing &ist updates the search hint, making subsequent 
+        // points faster if they are spatially close (which they are in a grid).
+        ssrf_intrc1(n, t_lats[k], t_lons[k], x, y, z, f, list, lptr, lend,
+                    iflgs, sigma, iflgg, grad, 
+                    &ist, &val, &local_ier);
+        
+        out_vals[k] = val;
+        
+        if (local_ier < 0) err_count++;
+    }
+    
+    *ier = err_count;
+}
+
+
 /* Estimate Gradient at node K (Local Method) */
 void ssrf_gradl(int n, int k, float *x, float *y, float *z, float *w, 
                 int *list, int *lptr, int *lend, float *g, int *ier) {
