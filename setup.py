@@ -4,7 +4,7 @@ import numpy
 ext = Extension(
     name="pytspack.tspack",
     sources=[
-        "pytspack/tspack_module.c",
+        "pytspack/renka.c",
         "pytspack/tspack.c",
         "pytspack/tripack.c",
         "pytspack/stripack.c",

@@ -8,12 +8,15 @@ class TestTspack(unittest.TestCase):
         x = np.array([0.0, 1.0, 2.0])
         y = np.array([0.0, 1.0, 0.0])
         # ncd=1 (derivatives), iendc=0, per=0, unifrm=0, sigma=None
-        yp, sigma = pytspack.tspsi(x, y, 1, 0, 0, 0, None)
+        # Updated tspsi returns (x, y, yp, sigma) to match legacy API
+        xn, yn, yp, sigma = pytspack.tspsi(x, y, 1, 0, 0, 0, None)
         self.assertEqual(len(yp), 3)
         self.assertEqual(len(sigma), 3)
 
         te = np.array([0.5, 1.5])
-        v = pytspack.tsval1(x, y, yp, sigma, te, 0)
+        # tsval1 takes (te, xydt) where xydt is tuple
+        xydt = (xn, yn, yp, sigma)
+        v = pytspack.tsval1(te, xydt)
         self.assertEqual(len(v), 2)
         # Simple check, exact values depend on spline logic but should be symmetric
         self.assertAlmostEqual(v[0], v[1])
