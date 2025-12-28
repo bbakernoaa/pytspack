@@ -2,9 +2,10 @@ import numpy as np
 import pytest
 from pytspack import tspsi, tsval1, hval, hpval, tspss
 
+
 def test_tspsi_basic():
-    x = np.array([0., 1., 2., 3., 4.])
-    y = np.array([0., 1., 4., 9., 16.])
+    x = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    y = np.array([0.0, 1.0, 4.0, 9.0, 16.0])
     x_out, y_out, yp, sigma = tspsi(x, y)
 
     assert np.array_equal(x, x_out)
@@ -12,9 +13,10 @@ def test_tspsi_basic():
     assert len(yp) == len(x)
     assert len(sigma) == len(x)
 
+
 def test_tsval1_evaluation():
-    x = np.array([0., 1., 2., 3., 4.])
-    y = np.array([0., 1., 4., 9., 16.])
+    x = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    y = np.array([0.0, 1.0, 4.0, 9.0, 16.0])
 
     xydt = tspsi(x, y)
 
@@ -22,9 +24,10 @@ def test_tsval1_evaluation():
 
     assert np.allclose(y, y_eval)
 
+
 def test_hval_evaluation():
-    x = np.array([0., 1., 2., 3., 4.])
-    y = np.array([0., 1., 4., 9., 16.])
+    x = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    y = np.array([0.0, 1.0, 4.0, 9.0, 16.0])
 
     x_out, y_out, yp, sigma = tspsi(x, y)
 
@@ -32,9 +35,10 @@ def test_hval_evaluation():
 
     assert np.allclose(y, y_eval)
 
+
 def test_hpval_evaluation():
-    x = np.array([0., 1., 2., 3., 4.])
-    y = np.array([0., 1., 4., 9., 16.])
+    x = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    y = np.array([0.0, 1.0, 4.0, 9.0, 16.0])
 
     x_out, y_out, yp, sigma = tspsi(x, y)
 
@@ -42,8 +46,9 @@ def test_hpval_evaluation():
 
     assert np.allclose(yp_eval, yp)
 
+
 def test_tspss_smoothing():
-    x = np.array([0., 1., 2., 3., 4.])
+    x = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
     y = np.array([0.1, 1.2, 3.9, 9.3, 15.8])
     w = np.ones_like(x)
     s = float(len(x))
@@ -55,9 +60,10 @@ def test_tspss_smoothing():
     assert len(sigma) == len(x)
     assert not np.allclose(y, ys)
 
+
 def test_tspsi_periodic():
-    x = np.linspace(0, 2*np.pi, 10, endpoint=False)
-    x = np.append(x, 2*np.pi)
+    x = np.linspace(0, 2 * np.pi, 10, endpoint=False)
+    x = np.append(x, 2 * np.pi)
     y = np.sin(x)
     y[-1] = y[0]
 
@@ -69,9 +75,10 @@ def test_tspsi_periodic():
     assert len(sigma) == len(x)
     assert np.isclose(yp[0], yp[-1])
 
+
 def test_tspsi_non_monotonic_x():
-    x = np.array([0., 2., 1., 3., 4.])
-    y = np.array([0., 1., 4., 9., 16.])
+    x = np.array([0.0, 2.0, 1.0, 3.0, 4.0])
+    y = np.array([0.0, 1.0, 4.0, 9.0, 16.0])
     with pytest.raises(RuntimeError) as excinfo:
         tspsi(x, y)
     assert "x-values are not strictly increasing" in str(excinfo.value)

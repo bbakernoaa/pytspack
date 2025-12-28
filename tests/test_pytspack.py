@@ -2,10 +2,11 @@ import unittest
 import numpy as np
 import pytspack
 
+
 class TestTspack(unittest.TestCase):
     def test_tspsi_tsval1(self):
-        x = np.array([0., 1., 2.])
-        y = np.array([0., 1., 0.])
+        x = np.array([0.0, 1.0, 2.0])
+        y = np.array([0.0, 1.0, 0.0])
         # ncd=1 (derivatives), iendc=0, per=0, unifrm=0, sigma=None
         yp, sigma = pytspack.tspsi(x, y, 1, 0, 0, 0, None)
         self.assertEqual(len(yp), 3)
@@ -18,23 +19,24 @@ class TestTspack(unittest.TestCase):
         self.assertAlmostEqual(v[0], v[1])
 
     def test_trmesh(self):
-        x = np.array([0., 1., 0., 1.])
-        y = np.array([0., 0., 1., 1.])
+        x = np.array([0.0, 1.0, 0.0, 1.0])
+        y = np.array([0.0, 0.0, 1.0, 1.0])
         res = pytspack.trmesh(x, y)
-        self.assertIn('list', res)
-        self.assertIn('lptr', res)
-        self.assertIn('lend', res)
-        self.assertIn('lnew', res)
+        self.assertIn("list", res)
+        self.assertIn("lptr", res)
+        self.assertIn("lend", res)
+        self.assertIn("lnew", res)
 
     def test_stri_trmesh(self):
         # 6 points on sphere (octahedron vertices)
-        x = np.array([1., 0., 0., -1., 0., 0.])
-        y = np.array([0., 1., 0., 0., -1., 0.])
-        z = np.array([0., 0., 1., 0., 0., -1.])
+        x = np.array([1.0, 0.0, 0.0, -1.0, 0.0, 0.0])
+        y = np.array([0.0, 1.0, 0.0, 0.0, -1.0, 0.0])
+        z = np.array([0.0, 0.0, 1.0, 0.0, 0.0, -1.0])
         res = pytspack.stri_trmesh(x, y, z)
-        self.assertIn('list', res)
-        self.assertIn('lptr', res)
-        self.assertIn('lend', res)
+        self.assertIn("list", res)
+        self.assertIn("lptr", res)
+        self.assertIn("lend", res)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()
