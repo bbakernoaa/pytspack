@@ -74,4 +74,4 @@ def test_tspsi_non_monotonic_x():
     y = np.array([0., 1., 4., 9., 16.])
     with pytest.raises(RuntimeError) as excinfo:
         tspsi(x, y)
-    assert "x-values are not strictly increasing" in str(excinfo.value)
+    assert "X-values are not strictly increasing" in str(excinfo.value)

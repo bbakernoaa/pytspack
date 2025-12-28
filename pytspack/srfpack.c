@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "srfpack.h"
+#include "common.h"
 
 /* Macros for 1-based indexing */
 #define X(i) x[(i)-1]
@@ -89,32 +90,6 @@ void arcint(double b, double x1, double x2, double y1, double y2, double h1, dou
     double gn = b1 * (hy1 * dx - hx1 * dy) + b2 * (hy2 * dx - hx2 * dy);
     *hxp = (gt * dx - gn * dy) / ds;
     *hyp = (gt * dy + gn * dx) / ds;
-}
-
-void snhcsh(double x, double* sinhm, double* coshm, double* coshmm) {
-    double ax, c1, c2, c3, c4, expx, f, xc, xs, xsd2, xsd4;
-    c1 = 0.1666666666659e0;
-    c2 = 0.8333333431546e-2;
-    c3 = 0.1984107350948e-3;
-    c4 = 0.2768286868175e-5;
-
-    ax = ABS(x);
-    xs = ax * ax;
-    if (ax <= 0.5) {
-        xc = x * xs;
-        *sinhm = xc * (((c4 * xs + c3) * xs + c2) * xs + c1);
-        xsd4 = 0.25 * xs;
-        xsd2 = xsd4 + xsd4;
-        f = (((c4 * xsd4 + c3) * xsd4 + c2) * xsd4 + c1) * xsd4;
-        *coshmm = xsd2 * f * (f + 2.0);
-        *coshm = *coshmm + xsd2;
-    } else {
-        expx = exp(ax);
-        *sinhm = -(((1.0 / expx + ax) + ax) - expx) / 2.0;
-        if (x < 0.0) *sinhm = -(*sinhm);
-        *coshm = ((1.0 / expx - 2.0) + expx) / 2.0;
-        *coshmm = *coshm - xs / 2.0;
-    }
 }
 
 void cntour(int nx, int ny, double* x, double* y, double* z, double cval, int lc, int ncmax, int* iwk, double* xc, double* yc, int* ilc, int* nc, int* ier) {
@@ -884,57 +859,6 @@ void setro3(double xk, double yk, double zk, double xi, double yi, double zi, do
 
 void sgprnt(int n, int lunit, int* list, int* lptr, int* lend, double* sigma) {
     /* Implementation omitted */
-}
-
-double sig0(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, int iflgb, double hbnd, double tol, int iflgs, double* sigma, int* ier) {
-    int lp1, lp2, lpl;
-    double bnd, rf, sig;
-    double sbig = 85.0;
-
-    rf = (double)iflgb;
-    bnd = hbnd;
-
-    *ier = -1;
-    if (MIN(n1, n2) < 1 || n1 == n2 || MAX(MAX(n1, n2), 3) > n || ABS(rf) != 1.0) return -1.0;
-
-    *ier = -2;
-    if (iflgs > 0) {
-        lpl = LEND(n1);
-        lp1 = LPTR(lpl);
-        while (LIST(lp1) != n2) {
-            lp1 = LPTR(lp1);
-            if (lp1 == lpl) break;
-        }
-        if (ABS(LIST(lp1)) != n2) return -1.0;
-
-        lpl = LEND(n2);
-        lp2 = LPTR(lpl);
-        while (LIST(lp2) != n1) {
-            lp2 = LPTR(lp2);
-            if (lp2 == lpl) break;
-        }
-        if (ABS(LIST(lp2)) != n1) return -1.0;
-    }
-
-    /* Dummy return for now as full sig0 implementation is complex and not core */
-    sig = 0.0;
-    *ier = 0;
-
-    if (iflgs > 0) {
-        SIGMA(lp1) = sig;
-        SIGMA(lp2) = sig;
-    }
-    return sig;
-}
-
-double sig1(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, int iflgb, double hpbnd, double tol, int iflgs, double* sigma, int* ier) {
-    *ier = 0;
-    return 0.0;
-}
-
-double sig2(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, double tol, int iflgs, double* sigma, int* ier) {
-    *ier = 0;
-    return 0.0;
 }
 
 void smsgs(int ncc, int* lcc, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, int iflgs, double* sigma, double* w, double p, int* nit, double dfmax, double* f, double* fxfy, int* ier) {

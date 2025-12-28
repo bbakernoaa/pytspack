@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "tspack.h"
+#include "common.h"
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -39,38 +40,6 @@ void arcl3d(int n, double* x, double* y, double* z, double* t, int* ier) {
         t[i] = t[i - 1] + sqrt(ds);
     }
     *ier = 0;
-}
-
-void snhcsh(double x, double* sinhm, double* coshm, double* coshmm) {
-    double ax = fabs(x);
-    double xs = ax * ax;
-    if (ax <= 0.5) {
-        double xc = x * xs;
-        double p1 = -3.51754964808151394800e5;
-        double p2 = -1.15614435765005216044e4;
-        double p3 = -1.63725857525983828727e2;
-        double p4 = -7.89474443963537015605e-1;
-        double q1 = -2.11052978884890840399e6;
-        double q2 = 3.61578279834431989373e4;
-        double q3 = -2.77711081420602794433e2;
-        double q4 = 1.0;
-        double p = ((p4 * xs + p3) * xs + p2) * xs + p1;
-        double q = ((q4 * xs + q3) * xs + q2) * xs + q1;
-        *sinhm = xc * (p / q);
-        double xsd4 = 0.25 * xs;
-        double xsd2 = xsd4 + xsd4;
-        p = ((p4 * xsd4 + p3) * xsd4 + p2) * xsd4 + p1;
-        q = ((q4 * xsd4 + q3) * xsd4 + q2) * xsd4 + q1;
-        double f = xsd4 * (p / q);
-        *coshmm = xsd2 * f * (f + 2.0);
-        *coshm = *coshmm + xsd2;
-    } else {
-        double expx = exp(ax);
-        *sinhm = -(((1.0 / expx + ax) + ax) - expx) / 2.0;
-        if (x < 0.0) *sinhm = -(*sinhm);
-        *coshm = ((1.0 / expx - 2.0) + expx) / 2.0;
-        *coshmm = *coshm - xs / 2.0;
-    }
 }
 
 int intrvl(double t, int n, double* x) {
@@ -477,18 +446,11 @@ void tspsi(int n, double* x, double* y, int ncd, int iendc, int per, int unifrm,
     *ier = iter;
 }
 
-double sig0(double x1, double x2, double y1, double y2, double y1p, double y2p,
-            int ifl, double hbnd, double tol, int* ier) { *ier = -99; return 0; }
-double sig1(double x1, double x2, double y1, double y2, double y1p, double y2p,
-            int ifl, double hpbnd, double tol, int* ier) { *ier = -99; return 0; }
-double sig2(double x1, double x2, double y1, double y2, double y1p, double y2p,
-            int ifl, double tol, int* ier) { *ier = -99; return 0; }
 void sigbi(int n, double* x, double* y, double* yp, double tol, double b[][5], double bmax,
            double* sigma, int* icflg, double* dsmax, int* ier) { *ier = -99; }
 void sigbp(int n, double* x, double* y, double* xp, double* yp, double tol, double* bl,
            double* bu, double bmax, double* sigma, double* dsmax, int* ier) { *ier = -99; }
 
-double store(double x) { return x; }
 double tsintl(double a, double b, int n, double* x, double* y, double* yp, double* sigma, int* ier) { *ier = -99; return 0; }
 void tspbi(int n, double* x, double* y, int ncd, int iendc, int per, double b[][5], double bmax,
            int lwk, double* wk, double* yp, double* sigma, int* icflg, int* ier) { *ier = -99; }

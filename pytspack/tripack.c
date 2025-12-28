@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 #include "tripack.h"
+#include "common.h"
 
 double swtol;
 
@@ -1406,13 +1407,6 @@ void optim(double* x, double* y, int na, int* list, int* lptr, int* lend, int* n
 
     *nit = iter;
     *ier = 0;
-}
-
-double store(double x) {
-    /* volatile to force storage */
-    volatile double y;
-    y = x;
-    return y;
 }
 
 void swap(int in1, int in2, int io1, int io2, int* list, int* lptr, int* lend, int* lp21) {

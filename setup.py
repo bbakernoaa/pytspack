@@ -1,4 +1,8 @@
+import os
 from setuptools import setup, Extension
+
+# Get the NumPy include directory.
+import numpy
 
 ext = Extension(
     name="pytspack.tspack",
@@ -8,7 +12,10 @@ ext = Extension(
         "pytspack/stripack.c",
         "pytspack/srfpack.c",
         "pytspack/ssrfpack.c",
+        "pytspack/common.c",
     ],
+    include_dirs=[numpy.get_include()],
+    extra_compile_args=["-std=c99"],
 )
 
 if __name__ == "__main__":
