@@ -55,8 +55,8 @@ void arcint(double b, double x1, double x2, double y1, double y2, double h1, dou
         gt = s1 + b2 * (d1 + d2 + 3.0 * b1 * (d1 - d2));
     } else if (sig <= 0.5) {
         sb2 = sig * b2;
-        snhcsh(sig, &sm, &cm, &cmm);
-        snhcsh(sb2, &sm2, &cm2, &dummy);
+        srf_snhcsh(sig, &sm, &cm, &cmm);
+        srf_snhcsh(sb2, &sm2, &cm2, &dummy);
         e = sig * sm - cmm - cmm;
         *hp = h1 + b2 * s1 + ((cm * sm2 - sm * cm2) * (d1 + d2) + sig * (cm * cm2 - (sm + sig) * sm2) * d1) / (sig * e);
         if (!dflag) return;
@@ -91,7 +91,7 @@ void arcint(double b, double x1, double x2, double y1, double y2, double h1, dou
     *hyp = (gt * dy + gn * dx) / ds;
 }
 
-void snhcsh(double x, double* sinhm, double* coshm, double* coshmm) {
+void srf_snhcsh(double x, double* sinhm, double* coshm, double* coshmm) {
     double ax, c1, c2, c3, c4, expx, f, xc, xs, xsd2, xsd4;
     c1 = 0.1666666666659e0;
     c2 = 0.8333333431546e-2;
@@ -265,7 +265,7 @@ void getsig(int n, double* x, double* y, double* h, int* list, int* lptr, int* l
 
         label3:
             if (sig <= 0.5) {
-                snhcsh(sig, &sinhm, &coshm, &coshmm);
+                srf_snhcsh(sig, &sinhm, &coshm, &coshmm);
                 t1 = coshm / sinhm;
                 fp = t1 + sig * (sig / sinhm - t1 * t1 + 1.0);
             } else {
@@ -314,7 +314,7 @@ void getsig(int n, double* x, double* y, double* h, int* list, int* lptr, int* l
             sig = sig + dsig;
             f0 = f;
             if (sig <= 0.5) {
-                snhcsh(sig, &sinhm, &coshm, &coshmm);
+                srf_snhcsh(sig, &sinhm, &coshm, &coshmm);
                 c1 = sig * coshm * d2 - sinhm * d1pd2;
                 c2 = sig * (sinhm + sig) * d2 - coshm * d1pd2;
                 a = c2 - c1;
@@ -686,7 +686,7 @@ void grcoef(double sigma, double dcub, double* d, double* sd) {
         *d = 4.0 / dcub;
         *sd = 2.0 / dcub;
     } else if (sig <= 0.5) {
-        snhcsh(sig, &sinhm, &coshm, &coshmm);
+        srf_snhcsh(sig, &sinhm, &coshm, &coshmm);
         e = (sig * sinhm - coshmm - coshmm) * dcub;
         *d = sig * (sig * coshm - sinhm) / e;
         *sd = sig * sinhm / e;
@@ -886,7 +886,7 @@ void sgprnt(int n, int lunit, int* list, int* lptr, int* lend, double* sigma) {
     /* Implementation omitted */
 }
 
-double sig0(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, int iflgb, double hbnd, double tol, int iflgs, double* sigma, int* ier) {
+double srf_sig0(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, int iflgb, double hbnd, double tol, int iflgs, double* sigma, int* ier) {
     int lp1, lp2, lpl;
     double bnd, rf, sig;
     double sbig = 85.0;
@@ -927,12 +927,12 @@ double sig0(int n1, int n2, int n, double* x, double* y, double* h, int* list, i
     return sig;
 }
 
-double sig1(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, int iflgb, double hpbnd, double tol, int iflgs, double* sigma, int* ier) {
+double srf_sig1(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, int iflgb, double hpbnd, double tol, int iflgs, double* sigma, int* ier) {
     *ier = 0;
     return 0.0;
 }
 
-double sig2(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, double tol, int iflgs, double* sigma, int* ier) {
+double srf_sig2(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, double tol, int iflgs, double* sigma, int* ier) {
     *ier = 0;
     return 0.0;
 }

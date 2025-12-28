@@ -25,12 +25,12 @@ void setro1(double xk, double yk, double zk, double xi, double yi, double zi, do
 void setro2(double xk, double yk, double zk, double xi, double yi, double zi, double s1, double s2, double w, double* row);
 void setro3(double xk, double yk, double zk, double xi, double yi, double zi, double s1, double s2, double s3, double w, double* row);
 void sgprnt(int n, int lunit, int* list, int* lptr, int* lend, double* sigma);
-double sig0(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, int iflgb, double hbnd, double tol, int iflgs, double* sigma, int* ier);
-double sig1(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, int iflgb, double hpbnd, double tol, int iflgs, double* sigma, int* ier);
-double sig2(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, double tol, int iflgs, double* sigma, int* ier);
+double srf_sig0(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, int iflgb, double hbnd, double tol, int iflgs, double* sigma, int* ier);
+double srf_sig1(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, int iflgb, double hpbnd, double tol, int iflgs, double* sigma, int* ier);
+double srf_sig2(int n1, int n2, int n, double* x, double* y, double* h, int* list, int* lptr, int* lend, double* hxhy, double tol, int iflgs, double* sigma, int* ier);
 void smsgs(int ncc, int* lcc, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, int iflgs, double* sigma, double* w, double p, int* nit, double dfmax, double* f, double* fxfy, int* ier);
 void smsurf(int ncc, int* lcc, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, int iflgs, double* sigma, double* w, double sm, double smtol, double gstol, int lprnt, double* f, double* fxfy, int* ier);
-void snhcsh(double x, double* sinhm, double* coshm, double* coshmm);
+void srf_snhcsh(double x, double* sinhm, double* coshm, double* coshmm);
 double trvol(double x1, double x2, double x3, double y1, double y2, double y3, double z1, double z2, double z3);
 void tval(double x, double y, double x1, double x2, double x3, double y1, double y2, double y3, double z1, double z2, double z3, double zx1, double zx2, double zx3, double zy1, double zy2, double zy3, int dflag, double* f, double* fx, double* fy, int* ier);
 void unif(int ncc, int* lcc, int n, double* x, double* y, double* z, double* grad, int* list, int* lptr, int* lend, int iflgs, double* sigma, int nrow, int nx, int ny, double* px, double* py, int sflag, double sval, double* zz, int* ier);

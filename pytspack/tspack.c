@@ -488,7 +488,7 @@ void sigbi(int n, double* x, double* y, double* yp, double tol, double b[][5], d
 void sigbp(int n, double* x, double* y, double* xp, double* yp, double tol, double* bl,
            double* bu, double bmax, double* sigma, double* dsmax, int* ier) { *ier = -99; }
 
-double store(double x) { return x; }
+double ts_store(double x) { return x; }
 double tsintl(double a, double b, int n, double* x, double* y, double* yp, double* sigma, int* ier) { *ier = -99; return 0; }
 void tspbi(int n, double* x, double* y, int ncd, int iendc, int per, double b[][5], double bmax,
            int lwk, double* wk, double* yp, double* sigma, int* icflg, int* ier) { *ier = -99; }

@@ -1,14 +1,17 @@
 from setuptools import setup, Extension
+import numpy
 
 ext = Extension(
     name="pytspack.tspack",
     sources=[
+        "pytspack/tspack_module.c",
         "pytspack/tspack.c",
         "pytspack/tripack.c",
         "pytspack/stripack.c",
         "pytspack/srfpack.c",
         "pytspack/ssrfpack.c",
     ],
+    include_dirs=[numpy.get_include()],
 )
 
 if __name__ == "__main__":

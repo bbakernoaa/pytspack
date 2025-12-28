@@ -31,7 +31,7 @@ void sigs(int n, double* x, double* y, double* yp, double tol, double* sigma, do
 void smcrv(int n, double* x, double* y, double* sigma, int period, double* w, double sm,
            double smtol, double wk[][10], double* ys, double* yp, int* ier);
 void snhcsh(double x, double* sinhm, double* coshm, double* coshmm);
-double store(double x);
+double ts_store(double x);
 double tsintl(double a, double b, int n, double* x, double* y, double* yp, double* sigma, int* ier);
 void tspbi(int n, double* x, double* y, int ncd, int iendc, int per, double b[][5], double bmax,
            int lwk, double* wk, double* yp, double* sigma, int* icflg, int* ier);

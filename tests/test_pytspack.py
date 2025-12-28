@@ -1,0 +1,40 @@
+import unittest
+import numpy as np
+import pytspack
+
+class TestTspack(unittest.TestCase):
+    def test_tspsi_tsval1(self):
+        x = np.array([0., 1., 2.])
+        y = np.array([0., 1., 0.])
+        # ncd=1 (derivatives), iendc=0, per=0, unifrm=0, sigma=None
+        yp, sigma = pytspack.tspsi(x, y, 1, 0, 0, 0, None)
+        self.assertEqual(len(yp), 3)
+        self.assertEqual(len(sigma), 3)
+
+        te = np.array([0.5, 1.5])
+        v = pytspack.tsval1(x, y, yp, sigma, te, 0)
+        self.assertEqual(len(v), 2)
+        # Simple check, exact values depend on spline logic but should be symmetric
+        self.assertAlmostEqual(v[0], v[1])
+
+    def test_trmesh(self):
+        x = np.array([0., 1., 0., 1.])
+        y = np.array([0., 0., 1., 1.])
+        res = pytspack.trmesh(x, y)
+        self.assertIn('list', res)
+        self.assertIn('lptr', res)
+        self.assertIn('lend', res)
+        self.assertIn('lnew', res)
+
+    def test_stri_trmesh(self):
+        # 6 points on sphere (octahedron vertices)
+        x = np.array([1., 0., 0., -1., 0., 0.])
+        y = np.array([0., 1., 0., 0., -1., 0.])
+        z = np.array([0., 0., 1., 0., 0., -1.])
+        res = pytspack.stri_trmesh(x, y, z)
+        self.assertIn('list', res)
+        self.assertIn('lptr', res)
+        self.assertIn('lend', res)
+
+if __name__ == '__main__':
+    unittest.main()
