@@ -75,3 +75,11 @@ def test_tspsi_non_monotonic_x():
     with pytest.raises(RuntimeError) as excinfo:
         tspsi(x, y)
     assert "x-values are not strictly increasing" in str(excinfo.value)
+
+def test_tspsi_conflicting_constraints():
+    """Test ValueError when both slopes and curvs are provided."""
+    x = np.array([0., 1., 2., 3., 4.])
+    y = np.array([0., 1., 4., 9., 16.])
+    with pytest.raises(ValueError) as excinfo:
+        tspsi(x, y, slopes=[0., 8.], curvs=[0., 2.])
+    assert "You can't constrain both the slopes and curvs at the endpoints" in str(excinfo.value)

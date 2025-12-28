@@ -4,6 +4,7 @@ import numpy as np
 import os
 import platform
 import glob
+from typing import List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -135,32 +136,59 @@ def hpval(xp, x, y, yp, sigma):
     return yp_out.tolist()
 
 
-def tspsi(x, y, ncd=1, slopes=None, curvs=None, per=0, tension=None):
-    """Subroutine which constructs a shape-preserving or
-      unconstrained interpolatory function.  Refer to
-      TSVAL1.
+def tspsi(x: Union[List[float], np.ndarray],
+          y: Union[List[float], np.ndarray],
+          ncd: int = 1,
+          slopes: Optional[List[float]] = None,
+          curvs: Optional[List[float]] = None,
+          per: int = 0,
+          tension: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Constructs a shape-preserving or unconstrained interpolatory function.
+
+    This function determines the first derivatives and tension factors
+    needed by `tsval1` to evaluate the interpolating tension spline.
 
     Parameters
     ----------
-    x : numpy array or list
-        x is the original values of the array.
-    y : type
-        Description of parameter `y`.
-    ncd : type
-        Description of parameter `ncd`.
-    slopes : type
-        Description of parameter `slopes`.
-    curvs : type
-        Description of parameter `curvs`.
-    per : type
-        Description of parameter `per`.
-    tension : type
-        Description of parameter `tension`.
+    x : Union[List[float], np.ndarray]
+        Array of abscissae for the data points. Must be strictly increasing.
+    y : Union[List[float], np.ndarray]
+        Array of ordinate values for the data points.
+    ncd : int, optional
+        Number of constraints, by default 1.
+        - 1 = shape-preserving
+        - 2 = unconstrained
+    slopes : Optional[List[float]], optional
+        Endpoint slope constraints `[slope_start, slope_end]`. If provided,
+        `curvs` must be None. By default None.
+    curvs : Optional[List[float]], optional
+        Endpoint curvature constraints `[curvature_start, curvature_end]`.
+        If provided, `slopes` must be None. By default None.
+    per : int, optional
+        Periodicity flag, by default 0.
+        - 0 = non-periodic
+        - 1 = periodic
+    tension : Optional[float], optional
+        Tension factor. If None, variable tension is used. If a value is
+        provided, uniform tension is used. By default None.
 
     Returns
     -------
-    type
-        Description of returned object.
+    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+        A tuple containing:
+        - x: The original abscissae.
+        - y: The original ordinate values.
+        - yp: The calculated first derivatives at the knots.
+        - sigma: The calculated tension factors.
+
+    Raises
+    ------
+    ValueError
+        If both `slopes` and `curvs` are provided.
+    TypeError
+        If `slopes` or `curvs` are not in the expected list format.
+    RuntimeError
+        If the underlying C function returns an error.
     """
     x = np.array(x, dtype=np.float64)
     y = np.array(y, dtype=np.float64)
