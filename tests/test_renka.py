@@ -39,11 +39,13 @@ def test_sphericalmesh_interpolate():
 
     # The interpolated value should be very close to the input value 18.0
     # because the interpolation grid point is very close to a data point.
-    assert np.isclose(
-        interpolated_data[lat_idx, lon_idx], 18.0, atol=1e-9
-    ), "Interpolated value at a known point is not as expected."
+    assert np.isclose(interpolated_data[lat_idx, lon_idx], 18.0, atol=1e-9), (
+        "Interpolated value at a known point is not as expected."
+    )
 
     # 3. Check for NaN values in the interior
     # The result may have NaNs on the boundary, but the interior should be finite.
     interior_view = interpolated_data[1:-1, 1:-1]
-    assert not np.isnan(interior_view).any(), "Interpolated data contains NaNs in its interior."
+    assert not np.isnan(interior_view).any(), (
+        "Interpolated data contains NaNs in its interior."
+    )
