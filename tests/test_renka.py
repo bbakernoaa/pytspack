@@ -6,15 +6,18 @@ import sys
 # Try importing dask/xarray
 try:
     import dask.array as da
+
     HAS_DASK = True
 except ImportError:
     HAS_DASK = False
 
 try:
     import xarray as xr
+
     HAS_XARRAY = True
 except ImportError:
     HAS_XARRAY = False
+
 
 class TestTspack(unittest.TestCase):
     def test_tspsi_tsval1(self):
@@ -73,7 +76,7 @@ class TestTspack(unittest.TestCase):
         pz = renka.intr_2d(px, py, x, y, z, mesh, sigma, grad)
 
         # Check result
-        self.assertAlmostEqual(pz[0], 1.0, places=5) # 0.5 + 0.5 = 1.0
+        self.assertAlmostEqual(pz[0], 1.0, places=5)  # 0.5 + 0.5 = 1.0
 
     def test_spherical_interpolation(self):
         # 6 points on sphere
@@ -89,9 +92,9 @@ class TestTspack(unittest.TestCase):
         sigma, grad = renka.ssrf_gradg(x, y, z, f, mesh)
 
         # Interpolate
-        val = 1.0/np.sqrt(2.0)
-        plat = np.array([np.arcsin(val)]) # Lat
-        plon = np.array([0.0]) # Lon?
+        val = 1.0 / np.sqrt(2.0)
+        plat = np.array([np.arcsin(val)])  # Lat
+        plon = np.array([0.0])  # Lon?
 
         # Let's just run it and ensure it runs without error.
         tlat = np.array([0.5])
@@ -148,12 +151,12 @@ class TestTspack(unittest.TestCase):
         xydt = (x_out, y_out, yp, sigma)
 
         t = np.random.rand(4, 4) * 10
-        da_t = xr.DataArray(t, dims=('a', 'b'))
+        da_t = xr.DataArray(t, dims=("a", "b"))
 
         res = renka.tsval1(da_t, xydt)
         self.assertIsInstance(res, xr.DataArray)
         self.assertEqual(res.shape, (4, 4))
-        self.assertEqual(res.dims, ('a', 'b'))
+        self.assertEqual(res.dims, ("a", "b"))
 
 
 if __name__ == "__main__":

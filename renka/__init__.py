@@ -12,6 +12,7 @@ from .renka import (
     ssrf_intr as _ssrf_intr,
 )
 
+
 def _flatten_and_eval(func, t_block, *args):
     """
     Helper to flatten input block, run function, and reshape result.
@@ -27,10 +28,12 @@ def _flatten_and_eval(func, t_block, *args):
     res_flat = func(t_flat, *args)
     return res_flat.reshape(t_block.shape)
 
+
 def _evaluate(xn, yn, yp, sigma, t, iflag):
     """
     Helper to evaluate spline at t with dask/xarray support.
     """
+
     # Wrapper for C function to fix arguments
     def wrapper(t_arr):
         # Flatten t_arr because C extension iterates on dim(0) only
@@ -41,22 +44,21 @@ def _evaluate(xn, yn, yp, sigma, t, iflag):
     # Check for xarray
     if "xarray" in sys.modules:
         import xarray as xr
+
         if isinstance(t, xr.DataArray):
-             return xr.apply_ufunc(
+            return xr.apply_ufunc(
                 wrapper,
                 t,
-                dask='parallelized',
+                dask="parallelized",
                 output_dtypes=[float],
             )
 
     # Check for dask
     if "dask" in sys.modules:
         import dask.array as da
+
         if isinstance(t, da.Array):
-            return t.map_blocks(
-                wrapper,
-                dtype=float
-            )
+            return t.map_blocks(wrapper, dtype=float)
 
     # Fallback to direct call (handles numpy array)
     return wrapper(t)
@@ -68,6 +70,7 @@ def _evaluate_surf(px, py, func, *args):
     func: underlying C wrapper (e.g. _intr_2d)
     args: extra args (mesh, sigma, grad...)
     """
+
     def wrapper(px_arr, py_arr):
         # Flatten
         px_flat = np.ascontiguousarray(px_arr.ravel())
@@ -78,27 +81,28 @@ def _evaluate_surf(px, py, func, *args):
     # Check for xarray
     if "xarray" in sys.modules:
         import xarray as xr
+
         if isinstance(px, xr.DataArray) or isinstance(py, xr.DataArray):
-             return xr.apply_ufunc(
+            return xr.apply_ufunc(
                 wrapper,
-                px, py,
-                dask='parallelized',
+                px,
+                py,
+                dask="parallelized",
                 output_dtypes=[float],
             )
 
     # Check for dask
     if "dask" in sys.modules:
         import dask.array as da
+
         if isinstance(px, da.Array) or isinstance(py, da.Array):
             # Ensure both are dask arrays or compatible
-            if not isinstance(px, da.Array): px = da.from_array(px, chunks=py.chunks)
-            if not isinstance(py, da.Array): py = da.from_array(py, chunks=px.chunks)
+            if not isinstance(px, da.Array):
+                px = da.from_array(px, chunks=py.chunks)
+            if not isinstance(py, da.Array):
+                py = da.from_array(py, chunks=px.chunks)
 
-            return da.map_blocks(
-                wrapper,
-                px, py,
-                dtype=float
-            )
+            return da.map_blocks(wrapper, px, py, dtype=float)
 
     # Fallback
     return wrapper(px, py)
@@ -185,7 +189,9 @@ def stri_trmesh(x, y, z):
     z_in = np.ascontiguousarray(z, dtype=float)
     return _stri_trmesh(x_in, y_in, z_in)
 
+
 # Planar Surface Interpolation
+
 
 def gradg(x, y, z, mesh):
     """
@@ -194,11 +200,12 @@ def gradg(x, y, z, mesh):
     Returns (sigma, grad).
     """
     # Extract mesh
-    list_arr = mesh['list']
-    lptr_arr = mesh['lptr']
-    lend_arr = mesh['lend']
+    list_arr = mesh["list"]
+    lptr_arr = mesh["lptr"]
+    lend_arr = mesh["lend"]
 
     return _gradg(x, y, z, list_arr, lptr_arr, lend_arr)
+
 
 def intr_2d(px, py, x, y, z, mesh, sigma, grad):
     """
@@ -209,13 +216,17 @@ def intr_2d(px, py, x, y, z, mesh, sigma, grad):
     grad: gradients (from gradg)
     Returns pz (interpolated values).
     """
-    list_arr = mesh['list']
-    lptr_arr = mesh['lptr']
-    lend_arr = mesh['lend']
+    list_arr = mesh["list"]
+    lptr_arr = mesh["lptr"]
+    lend_arr = mesh["lend"]
 
-    return _evaluate_surf(px, py, _intr_2d, x, y, z, list_arr, lptr_arr, lend_arr, sigma, grad)
+    return _evaluate_surf(
+        px, py, _intr_2d, x, y, z, list_arr, lptr_arr, lend_arr, sigma, grad
+    )
+
 
 # Spherical Surface Interpolation
+
 
 def ssrf_gradg(x, y, z, f, mesh):
     """
@@ -224,11 +235,12 @@ def ssrf_gradg(x, y, z, f, mesh):
     mesh: triangulation from stri_trmesh.
     Returns (sigma, grad).
     """
-    list_arr = mesh['list']
-    lptr_arr = mesh['lptr']
-    lend_arr = mesh['lend']
+    list_arr = mesh["list"]
+    lptr_arr = mesh["lptr"]
+    lend_arr = mesh["lend"]
 
     return _ssrf_gradg(x, y, z, f, list_arr, lptr_arr, lend_arr)
+
 
 def ssrf_intr(plat, plon, x, y, z, f, mesh, sigma, grad):
     """
@@ -239,8 +251,10 @@ def ssrf_intr(plat, plon, x, y, z, f, mesh, sigma, grad):
     sigma, grad: from ssrf_gradg
     Returns pval.
     """
-    list_arr = mesh['list']
-    lptr_arr = mesh['lptr']
-    lend_arr = mesh['lend']
+    list_arr = mesh["list"]
+    lptr_arr = mesh["lptr"]
+    lend_arr = mesh["lend"]
 
-    return _evaluate_surf(plat, plon, _ssrf_intr, x, y, z, f, list_arr, lptr_arr, lend_arr, sigma, grad)
+    return _evaluate_surf(
+        plat, plon, _ssrf_intr, x, y, z, f, list_arr, lptr_arr, lend_arr, sigma, grad
+    )
