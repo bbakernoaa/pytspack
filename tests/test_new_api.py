@@ -34,5 +34,6 @@ class TestNewApi(unittest.TestCase):
         self.assertEqual(results.shape, (2, 2))
         self.assertTrue(np.all(np.isfinite(results)))
 
+
 if __name__ == "__main__":
     unittest.main()
