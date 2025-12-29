@@ -206,39 +206,52 @@ class SphericalMesh:
             # Silently fail if symbols are not available
             pass
 
-    def interpolate(self, values, grid_lats, grid_lons):
-        """Rectilinear Grid Interpolation"""
-        vals = np.ascontiguousarray(values, dtype=np.float64)
-        g_lat = self._check_and_convert(grid_lats, True)
-        g_lon = self._check_and_convert(grid_lons, False)
-        ni, nj = len(g_lat), len(g_lon)
-        ff = np.zeros(ni * nj, dtype=np.float64)
-        ier = c_int()
+    def interpolate(
+        self,
+        values: np.ndarray,
+        grid_lats: np.ndarray,
+        grid_lons: np.ndarray,
+    ) -> np.ndarray:
+        """Interpolates data onto a rectilinear grid.
 
-        _lib.unif(
-            0,
-            np.zeros(1, dtype=np.int32),
-            self.n,
-            self.x,
-            self.y,
-            self.z,
-            vals,
-            self.list,
-            self.lptr,
-            self.lend,
-            0,
-            np.zeros(1, dtype=np.float64),
-            ni,
-            ni,
-            nj,
-            g_lat,
-            g_lon,
-            0,
-            0.0,
-            ff,
-            byref(ier),
-        )
-        return ff.reshape((nj, ni)).T
+        This method is a convenience wrapper around `interpolate_points`. It
+        constructs a grid, flattens it, performs the point-wise
+        interpolation, and then reshapes the result back into a 2D grid.
+
+        .. warning::
+           This function can be slow for large grids due to the underlying
+           loop in `interpolate_points`.
+
+        Parameters
+        ----------
+        values : np.ndarray
+            A 1D NumPy array of data values corresponding to the input `lats`
+            and `lons` used to initialize the `SphericalMesh`. The array
+            length must be equal to `n`.
+        grid_lats : np.ndarray
+            A 1D NumPy array specifying the latitude coordinates of the
+            output grid. Values can be in degrees or radians.
+        grid_lons : np.ndarray
+            A 1D NumPy array specifying the longitude coordinates of the
+            output grid. Values can be in degrees or radians.
+
+        Returns
+        -------
+        np.ndarray
+            A 2D NumPy array of shape `(len(grid_lats), len(grid_lons))`
+            containing the interpolated values. Points outside the convex
+            hull of the data will be `np.nan`.
+        """
+        # Create a meshgrid and flatten it for point-wise interpolation
+        lon_grid, lat_grid = np.meshgrid(grid_lons, grid_lats)
+        flat_lats = lat_grid.flatten()
+        flat_lons = lon_grid.flatten()
+
+        # Interpolate at the flattened points
+        interpolated_values = self.interpolate_points(values, flat_lats, flat_lons)
+
+        # Reshape the 1D result back to the 2D grid shape
+        return interpolated_values.reshape(len(grid_lats), len(grid_lons))
 
     def interpolate_points(self, values, point_lats, point_lons):
         """Curvilinear (point-based) Grid Interpolation"""
