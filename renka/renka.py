@@ -100,25 +100,23 @@ class SphericalMesh:
         self.list = np.zeros(list_len, dtype=np.int32)
         self.lptr = np.zeros(list_len, dtype=np.int32)
         self.lend = np.zeros(self.n, dtype=np.int32)
-        self.lnew = c_int(0)
 
-        _lib.trmesh.argtypes = [
-            c_int,
-            c_double_p,
-            c_double_p,
-            c_double_p,
-            c_int_p,
-            c_int_p,
-            c_int_p,
-            POINTER(c_int),
-            c_int_p,
-            c_int_p,
-            c_double_p,
-            POINTER(c_int),
-        ]
+        try:
+            _lib.stri_trmesh.argtypes = [
+                c_int,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_int_p,
+                c_int_p,
+                c_int_p,
+                POINTER(c_int),
+            ]
+        except AttributeError:
+            raise ImportError("stri_trmesh function not found in library.")
 
         ier = c_int()
-        _lib.trmesh(
+        _lib.stri_trmesh(
             self.n,
             self.x,
             self.y,
@@ -126,15 +124,11 @@ class SphericalMesh:
             self.list,
             self.lptr,
             self.lend,
-            byref(self.lnew),
-            np.zeros(self.n, dtype=np.int32),
-            np.zeros(self.n, dtype=np.int32),
-            np.zeros(self.n, dtype=np.float64),
             byref(ier),
         )
 
-        if ier.value < 0:
-            raise RuntimeError(f"TRMESH Error: {ier.value}")
+        if ier.value != 0:
+            raise RuntimeError(f"STRIPACK TRMESH Error: {ier.value}")
         self._bind()
 
     def _check_and_convert(self, arr, is_lat=False):
@@ -172,6 +166,46 @@ class SphericalMesh:
         except AttributeError:
             pass
 
+        try:
+            _lib.ssrf_gradg.argtypes = [
+                c_int,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_int_p,
+                c_int_p,
+                c_int_p,
+                c_int,
+                c_double_p,
+                POINTER(c_int),
+                POINTER(c_double),
+                c_double_p,
+                POINTER(c_int),
+            ]
+            _lib.ssrf_intrc1.argtypes = [
+                c_int,
+                c_double,
+                c_double,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_int_p,
+                c_int_p,
+                c_int_p,
+                c_int,
+                c_double_p,
+                c_int,
+                c_double_p,
+                POINTER(c_int),
+                POINTER(c_double),
+                POINTER(c_int),
+            ]
+        except AttributeError:
+            # Silently fail if symbols are not available
+            pass
+
     def interpolate(self, values, grid_lats, grid_lons):
         """Rectilinear Grid Interpolation"""
         vals = np.ascontiguousarray(values, dtype=np.float64)
@@ -205,3 +239,46 @@ class SphericalMesh:
             byref(ier),
         )
         return ff.reshape((nj, ni)).T
+
+    def interpolate_points(self, values, point_lats, point_lons):
+        """Curvilinear (point-based) Grid Interpolation"""
+        vals = np.ascontiguousarray(values, dtype=np.float64)
+        p_lat = self._check_and_convert(point_lats, True)
+        p_lon = self._check_and_convert(point_lons, False)
+        n_pts = len(p_lat)
+        if n_pts != len(p_lon):
+            raise ValueError("point_lats and point_lons must have the same size.")
+
+        # 1. Compute gradients
+        sigma = np.zeros(self.n, dtype=np.float64)
+        grad = np.zeros(3 * self.n, dtype=np.float64)
+        ier = c_int()
+        nit = c_int(20)
+        dgmax = c_double(0.0)
+
+        _lib.ssrf_gradg(
+            self.n, self.x, self.y, self.z, vals,
+            self.list, self.lptr, self.lend,
+            0, sigma, byref(nit), byref(dgmax), grad, byref(ier)
+        )
+        if ier.value < 0:
+            raise RuntimeError(f"ssrf_gradg failed with error code {ier.value}")
+
+        # 2. Interpolate at each point
+        fp = np.zeros(n_pts, dtype=np.float64)
+        ist = c_int(1)
+
+        for i in range(n_pts):
+            fp_i = c_double(0.0)
+            _lib.ssrf_intrc1(
+                self.n, p_lat[i], p_lon[i],
+                self.x, self.y, self.z, vals,
+                self.list, self.lptr, self.lend,
+                0, sigma, 1, grad, byref(ist), byref(fp_i), byref(ier)
+            )
+            if ier.value < 0:
+                # Non-fatal errors (e.g., extrapolation) are positive
+                raise RuntimeError(f"ssrf_intrc1 failed at point {i} with error code {ier.value}")
+            fp[i] = fp_i.value
+
+        return fp
