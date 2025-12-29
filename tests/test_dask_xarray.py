@@ -97,5 +97,37 @@ class TestDaskXarraySupport(unittest.TestCase):
         expected = renka.hval(self.t, x_out, y_out, yp, sigma)
         np.testing.assert_allclose(computed, expected)
 
+    @unittest.skipUnless(HAS_DASK, "Dask not installed")
+    def test_trmesh_dask(self):
+        # Test trmesh with Dask inputs
+        x = np.array([0.0, 1.0, 0.0, 1.0])
+        y = np.array([0.0, 0.0, 1.0, 1.0])
+
+        dx = da.from_array(x, chunks=2)
+        dy = da.from_array(y, chunks=2)
+
+        # Should execute eagerly and return dict with numpy arrays
+        res = renka.trmesh(dx, dy)
+        self.assertIsInstance(res, dict)
+        self.assertIsInstance(res['list'], np.ndarray)
+        self.assertIsInstance(res['lptr'], np.ndarray)
+
+    @unittest.skipUnless(HAS_DASK, "Dask not installed")
+    def test_stri_trmesh_dask(self):
+        # Test stri_trmesh with Dask inputs
+        x = np.array([1.0, 0.0, 0.0, -1.0, 0.0, 0.0])
+        y = np.array([0.0, 1.0, 0.0, 0.0, -1.0, 0.0])
+        z = np.array([0.0, 0.0, 1.0, 0.0, 0.0, -1.0])
+
+        dx = da.from_array(x, chunks=2)
+        dy = da.from_array(y, chunks=2)
+        dz = da.from_array(z, chunks=2)
+
+        # Should execute eagerly and return dict with numpy arrays
+        res = renka.stri_trmesh(dx, dy, dz)
+        self.assertIsInstance(res, dict)
+        self.assertIsInstance(res['list'], np.ndarray)
+        self.assertIsInstance(res['lptr'], np.ndarray)
+
 if __name__ == '__main__':
     unittest.main()

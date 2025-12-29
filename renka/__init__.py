@@ -170,7 +170,9 @@ def trmesh(x, y):
     Create a triangulation for 2D points.
     Returns dictionary with list, lptr, lend, lnew.
     """
-    return _trmesh(x, y)
+    x_in = np.ascontiguousarray(x, dtype=float)
+    y_in = np.ascontiguousarray(y, dtype=float)
+    return _trmesh(x_in, y_in)
 
 
 def stri_trmesh(x, y, z):
@@ -178,7 +180,10 @@ def stri_trmesh(x, y, z):
     Create a triangulation for points on a sphere.
     Returns dictionary with list, lptr, lend.
     """
-    return _stri_trmesh(x, y, z)
+    x_in = np.ascontiguousarray(x, dtype=float)
+    y_in = np.ascontiguousarray(y, dtype=float)
+    z_in = np.ascontiguousarray(z, dtype=float)
+    return _stri_trmesh(x_in, y_in, z_in)
 
 # Planar Surface Interpolation
 
