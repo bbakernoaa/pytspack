@@ -1,92 +1,38 @@
-# pytspack
+# renka
 
-Python Wrapper around Robert J. Renka's [TSPACK](http://www.netlib.no/netlib/toms/716).
+A high-performance Python wrapper for Robert J. Renka's C libraries for triangulation and interpolation, including:
 
-> TSPACK is a curve-fitting package based on exponential tension splines with automatic selection of tension factors.
+*   **TSPACK:** Tension Spline Curve Fitting
+*   **STRIPACK:** Delaunay Triangulation on a Sphere
+*   **SSRFPACK:** Scattered Data Interpolation on a Sphere
+*   **SRFPACK:** Scattered Data Interpolation on a Plane
+*   **TRIPACK:** Planar Triangulation
+
+This package provides direct access to the C functions, enabling high-performance geospatial and scientific computing in Python.
 
 ## Installation
 
-For NOAA Hera users:
-```
-OPT='-std=c99' pip install https://github.com/noaa-oar-arl/pytspack/archive/master.zip
-```
-or see the Linux notes [below](#linux).
+This package requires a C compiler and NumPy to be installed.
 
----
+### Standard Installation
 
-If you are lucky,
-```
-pip install https://github.com/noaa-oar-arl/pytspack/archive/master.zip
-```
-will *just work*.
+For most users, a simple `pip` install from the repository root will work:
 
-Alternatively, if the above [^b] fails, try
-```
-pip install https://github.com/noaa-oar-arl/pytspack/archive/master.zip --no-use-pep517 --no-deps
-```
-(you must already have `numpy` installed and currently must have `setuptools` earlier than v65).
-
-Otherwise, you can clone the repo and try to build the extension module
-using [`f2py`](https://numpy.org/doc/stable/f2py/index.html) manually...
-
-
-[^b]: [Build-time dependency specification](https://pip.pypa.io/en/stable/reference/build-system/pyproject-toml/#build-time-dependencies) via `pyproject.toml` file.
-
-### Windows
-
-On Windows, with a [GNU Fortran via MSYS2](https://numpy.org/doc/stable/f2py/windows/msys2.html)
-setup, try the following:
-
-1. Clone the repo
-   ```powershell
-   git clone https://github.com/noaa-oar-arl/pytspack
-   cd pytspack
-   ```
-
-2. Build the extension, using one of these options
-
-   Using the `setup.py`:
-   ```
-   python setup.py build_ext --fcompiler=gnu95 --compiler=mingw32 --build-lib=./pytspack
-   ```
-
-   OR
-
-   Using `f2py` directly:
-   ```powershell
-   cd pytspack
-   python -m numpy.f2py -c --fcompiler=gnu95 --compiler=mingw32 -m tspack tspack.f
-   cd ..
-   ```
-
-3. Link pytspack to your active Python environment.
-   ```powershell
-   pip install -e . --no-use-pep517
-   ```
-
-### Linux
-
-We have seen some issues where some `gcc`s do not want to compile the `fortranobject.c` [^a]
-
-Follow the same general steps as above, but don't use `--compiler=mingw32`.
-
-On NOAA Hera, the default GCC is currently v4.
-Use `module load gnu` to get newer before attempting to install pytspack,
-or use
 ```bash
-OPT='-std=c99' python -m numpy.f2py -c -m tspack tspack.f
+pip install .
 ```
-to configure `gcc`.
 
-`OPT='-std=c99'` can also be prepended to [the `pip install` above](#installation),
-enabling an installation without cloning the repo.
+This command compiles the C extension and installs the `renka` package into your active Python environment.
 
+### Editable Mode
 
-[^a]: As mentioned [here](https://mfix.netl.doe.gov/forum/t/strange-build-error-in-mfix-21-4/3923/3), for example.
+For development, install the package in editable mode:
 
-## More information
+```bash
+pip install -e .
+```
 
-For more information on TSPACK, see [the open-access paper](https://dl.acm.org/doi/10.1145/151271.151277) (Renka, 1993) or [the netlib page](https://web.archive.org/web/20220701070001/http://netlib.no/netlib/toms/716).
+This allows you to modify the Python wrapper code and have the changes immediately reflected without reinstalling.
 
 ## Disclaimer
 
