@@ -4,7 +4,7 @@ import os
 
 # Define compiler flags
 extra_args = ["-std=c99", "-O3"]
-if os.name != 'nt':
+if os.name != "nt":
     extra_args.append("-fPIC")
 
 librenka = Extension(
@@ -15,7 +15,7 @@ librenka = Extension(
         "src/ssrfpack.c",
         "src/srfpack.c",
         "src/tripack.c",
-        "src/renka.c"
+        "src/renka.c",
     ],
     include_dirs=["src", numpy.get_include()],
     extra_compile_args=extra_args,

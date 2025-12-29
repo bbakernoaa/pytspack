@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from renka import TsPack, SphericalMesh
 
+
 def test_tspack_interpolation():
     """Test the TsPack class."""
     x = np.array([0.0, 1.0, 2.0, 3.0])
@@ -15,6 +16,7 @@ def test_tspack_interpolation():
 
     assert results.shape == (3,)
     assert np.all(np.isfinite(results))
+
 
 def test_spherical_mesh_interpolation():
     """Test the SphericalMesh class."""
