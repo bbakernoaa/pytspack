@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from pytspack import tspsi, tsval1, hval, hpval, tspss
+from renka import tspsi, tsval1, hval, hpval, tspss
 
 
 def test_tspsi_basic():
