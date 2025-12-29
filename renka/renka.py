@@ -257,9 +257,20 @@ class SphericalMesh:
         dgmax = c_double(0.0)
 
         _lib.ssrf_gradg(
-            self.n, self.x, self.y, self.z, vals,
-            self.list, self.lptr, self.lend,
-            0, sigma, byref(nit), byref(dgmax), grad, byref(ier)
+            self.n,
+            self.x,
+            self.y,
+            self.z,
+            vals,
+            self.list,
+            self.lptr,
+            self.lend,
+            0,
+            sigma,
+            byref(nit),
+            byref(dgmax),
+            grad,
+            byref(ier),
         )
         if ier.value < 0:
             raise RuntimeError(f"ssrf_gradg failed with error code {ier.value}")
@@ -271,14 +282,29 @@ class SphericalMesh:
         for i in range(n_pts):
             fp_i = c_double(0.0)
             _lib.ssrf_intrc1(
-                self.n, p_lat[i], p_lon[i],
-                self.x, self.y, self.z, vals,
-                self.list, self.lptr, self.lend,
-                0, sigma, 1, grad, byref(ist), byref(fp_i), byref(ier)
+                self.n,
+                p_lat[i],
+                p_lon[i],
+                self.x,
+                self.y,
+                self.z,
+                vals,
+                self.list,
+                self.lptr,
+                self.lend,
+                0,
+                sigma,
+                1,
+                grad,
+                byref(ist),
+                byref(fp_i),
+                byref(ier),
             )
             if ier.value < 0:
                 # Non-fatal errors (e.g., extrapolation) are positive
-                raise RuntimeError(f"ssrf_intrc1 failed at point {i} with error code {ier.value}")
+                raise RuntimeError(
+                    f"ssrf_intrc1 failed at point {i} with error code {ier.value}"
+                )
             fp[i] = fp_i.value
 
         return fp
