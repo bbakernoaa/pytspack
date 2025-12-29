@@ -1,2 +1,14 @@
 [build-system]
-requires = ["setuptools<65", "wheel", "numpy"]
+requires = ["setuptools>=61.0.0", "wheel", "numpy>=1.21.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "renka"
+version = "0.2.0"
+description = "High-performance C port of Renka triangulation and interpolation algorithms"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = [
+    "numpy>=1.21.0"
+]

@@ -1,28 +1,27 @@
 from setuptools import setup, Extension
 import numpy
+import os
 
-# Set up the extension module
-ext = Extension(
-    "renka.renka",  # Package renka, extension renka
+# Define compiler flags
+extra_args = ["-std=c99", "-O3"]
+if os.name != 'nt':
+    extra_args.append("-fPIC")
+
+librenka = Extension(
+    name="renka._librenka",
     sources=[
-        "renka/renka.c",
-        "renka/srfpack.c",
-        "renka/ssrfpack.c",
-        "renka/stripack.c",
-        "renka/tripack.c",
-        "renka/tspack.c",
+        "src/tspack.c",
+        "src/stripack.c",
+        "src/ssrfpack.c",
+        "src/srfpack.c",
+        "src/tripack.c",
+        "src/renka.c"
     ],
-    include_dirs=[numpy.get_include(), "renka"],
-    # Ensure C99/Math lib if needed
-    extra_compile_args=["-O3", "-fPIC"],
+    include_dirs=["src", numpy.get_include()],
+    extra_compile_args=extra_args,
 )
 
 setup(
-    name="renka",
-    version="0.1.0",
-    description="Python interface to Renka's triangulation and spline packages (tspack, tripack, stripack, srfpack, ssrfpack)",
+    ext_modules=[librenka],
     packages=["renka"],
-    ext_modules=[ext],
-    setup_requires=["numpy"],
-    install_requires=["numpy"],
 )
