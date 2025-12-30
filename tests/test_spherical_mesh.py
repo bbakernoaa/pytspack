@@ -33,8 +33,10 @@ def test_spherical_mesh_interpolate_points():
 
     # Assert the values are plausible.
     # The value at (0, 45) should be between 10 and 20.
-    assert 10.0 < interpolated_values[0] < 20.0, "Interpolation at equator is out of range."
+    assert 10.0 < interpolated_values[0] < 20.0, (
+        "Interpolation at equator is out of range."
+    )
     # The value at (85, 0) should be close to 30 (the north pole value).
-    assert np.isclose(
-        interpolated_values[1], 30.0, atol=2.0
-    ), "Interpolation near the pole is inaccurate."
+    assert np.isclose(interpolated_values[1], 30.0, atol=2.0), (
+        "Interpolation near the pole is inaccurate."
+    )
