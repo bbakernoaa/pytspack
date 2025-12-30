@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from renka.renka import SphericalMesh
 
+
 @pytest.mark.parametrize("num_points", [10, 100, 1000])
 def test_benchmark_regrid_conservative_scaling_source(benchmark, num_points):
     """
@@ -21,6 +22,7 @@ def test_benchmark_regrid_conservative_scaling_source(benchmark, num_points):
 
     # Benchmark the regridding function
     benchmark(mesh.regrid_conservative, values, grid_lats, grid_lons)
+
 
 @pytest.mark.parametrize("grid_size", [10, 50, 100])
 def test_benchmark_regrid_conservative_scaling_grid(benchmark, grid_size):
@@ -42,6 +44,7 @@ def test_benchmark_regrid_conservative_scaling_grid(benchmark, grid_size):
     # Benchmark the regridding function
     benchmark(mesh.regrid_conservative, values, grid_lats, grid_lons)
 
+
 @pytest.mark.parametrize("num_points", [10, 100, 1000])
 def test_benchmark_interpolate_scaling_source(benchmark, num_points):
     """
@@ -61,6 +64,7 @@ def test_benchmark_interpolate_scaling_source(benchmark, num_points):
 
     # Benchmark the interpolation function
     benchmark(mesh.interpolate, values, grid_lats, grid_lons)
+
 
 @pytest.mark.parametrize("grid_size", [10, 50, 100])
 def test_benchmark_interpolate_scaling_grid(benchmark, grid_size):
