@@ -19,3 +19,7 @@ docs = [
     "mkdocs-material",
     "mkdocstrings[python]",
 ]
+test = [
+    "pytest",
+    "pytest-benchmark",
+]
