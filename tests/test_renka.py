@@ -83,9 +83,9 @@ def test_sphericalmesh_regrid_conservative():
     # original data. This is a fundamental property of conservative
     # regridding.
     # Note: This is an approximate conservation, so we use a tolerance.
-    assert np.isclose(
-        np.sum(regridded_data), np.sum(values), rtol=1e-6
-    ), "Conservative regridding is not preserving the total sum."
+    assert np.isclose(np.sum(regridded_data), np.sum(values), rtol=1e-6), (
+        "Conservative regridding is not preserving the total sum."
+    )
 
     # 3. Check for NaN values in the interior
     # The result may have NaNs on the boundary, but the interior should be finite.

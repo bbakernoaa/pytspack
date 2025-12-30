@@ -208,10 +208,21 @@ class SphericalMesh:
             ]
             c_float_p = np.ctypeslib.ndpointer(dtype=np.float32, flags="C_CONTIGUOUS")
             _lib.ssrf_conservative_regrid.argtypes = [
-                c_int, c_float_p, c_float_p, c_float_p, c_float_p,
-                c_int_p, c_int_p, c_int_p,
-                c_int, c_int, c_float_p, c_float_p,
-                c_int, c_float_p, POINTER(c_int)
+                c_int,
+                c_float_p,
+                c_float_p,
+                c_float_p,
+                c_float_p,
+                c_int_p,
+                c_int_p,
+                c_int_p,
+                c_int,
+                c_int,
+                c_float_p,
+                c_float_p,
+                c_int,
+                c_float_p,
+                POINTER(c_int),
             ]
         except AttributeError:
             # Silently fail if symbols are not available
@@ -368,15 +379,30 @@ class SphericalMesh:
 
         try:
             _lib.ssrf_conservative_regrid(
-                self.n, self.x_f32, self.y_f32, self.z_f32, vals,
-                self.list, self.lptr, self.lend,
-                ni, nj, g_lat, g_lon,
-                samples, out_grid, byref(ier)
+                self.n,
+                self.x_f32,
+                self.y_f32,
+                self.z_f32,
+                vals,
+                self.list,
+                self.lptr,
+                self.lend,
+                ni,
+                nj,
+                g_lat,
+                g_lon,
+                samples,
+                out_grid,
+                byref(ier),
             )
             if ier.value != 0:
-                raise ValueError(f"Conservative regridding failed with error code {ier.value}")
+                raise ValueError(
+                    f"Conservative regridding failed with error code {ier.value}"
+                )
         except AttributeError:
-            raise RuntimeError("C library does not support conservative regridding yet.")
+            raise RuntimeError(
+                "C library does not support conservative regridding yet."
+            )
 
         regridded_data = out_grid.reshape((nj, ni)).T
 
@@ -384,6 +410,6 @@ class SphericalMesh:
         regridded_sum = np.sum(regridded_data)
         values_sum = np.sum(values)
         if regridded_sum > 1e-9:  # Avoid division by zero
-            regridded_data *= (values_sum / regridded_sum)
+            regridded_data *= values_sum / regridded_sum
 
         return regridded_data
