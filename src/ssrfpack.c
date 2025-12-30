@@ -1107,3 +1107,88 @@ void ssrf_unif(int n, double* x, double* y, double* z, double* f, int* list, int
     }
     *ier = nex;
 }
+/* * Conservative Regridding via Sub-grid Sampling.
+ * * Instead of simple interpolation, this function divides each target pixel
+ * into `sub_samples` x `sub_samples` sub-pixels. It finds the nearest
+ * source node (which defines the Voronoi cell) for each sub-pixel.
+ * * Value = (Sum of Source_Vals[Nearest_Node]) / Total_Samples
+ */
+void ssrf_conservative_regrid(int n, float *x, float *y, float *z, float *vals,
+                              int *list, int *lptr, int *lend,
+                              int ni, int nj, float *plat, float *plon,
+                              int sub_samples, float *out_grid, int *ier) {
+
+    int ist = 1;
+    int err = 0;
+
+    /* Safety check for grid size */
+    if (ni < 2 || nj < 2 || sub_samples < 1) {
+        *ier = -1;
+        return;
+    }
+
+    for (int j = 0; j < nj; j++) {
+        /* Robust Boundary Logic for Longitude */
+        float lon_min = plon[j];
+        float d_lon;
+
+        if (j < nj - 1) {
+             /* Standard case: distance to next pixel */
+             d_lon = (plon[j+1] - plon[j]) / sub_samples;
+        } else {
+             /* Edge case: assume same width as previous pixel */
+             d_lon = (plon[j] - plon[j-1]) / sub_samples;
+        }
+
+        for (int i = 0; i < ni; i++) {
+            /* Robust Boundary Logic for Latitude */
+            float lat_min = plat[i];
+            float d_lat;
+
+            if (i < ni - 1) {
+                d_lat = (plat[i+1] - plat[i]) / sub_samples;
+            } else {
+                d_lat = (plat[i] - plat[i-1]) / sub_samples;
+            }
+
+            double cell_sum = 0.0; /* Accumulate in double for precision */
+            int valid_samples = 0;
+
+            for (int sy = 0; sy < sub_samples; sy++) {
+                /* Sample center offset by 0.5 */
+                float slon = lon_min + ((float)sy + 0.5f) * d_lon;
+
+                for (int sx = 0; sx < sub_samples; sx++) {
+                    float slat = lat_min + ((float)sx + 0.5f) * d_lat;
+
+                    /* Convert spherical to cartesian unit vector */
+                    /* Must use float array for stri_nearnd */
+                    float p[3];
+                    p[0] = cosf(slat) * cosf(slon);
+                    p[1] = cosf(slat) * sinf(slon);
+                    p[2] = sinf(slat);
+
+                    /* Find Nearest Node */
+                    float dist; /* Renka uses float (REAL) */
+
+                    /* CRITICAL: Ensure x, y, z arrays passed here are FLOAT pointers */
+                    int nearest = stri_nearnd(p, ist, n, x, y, z, list, lptr, lend, &dist);
+
+                    if (nearest > 0) {
+                        cell_sum += vals[nearest - 1];
+                        ist = nearest; /* Optimization: update search hint */
+                        valid_samples++;
+                    }
+                }
+            }
+
+            if (valid_samples > 0) {
+                out_grid[j * ni + i] = (float)(cell_sum / valid_samples);
+            } else {
+                out_grid[j * ni + i] = 0.0f;
+                err++;
+            }
+        }
+    }
+    *ier = err;
+}

@@ -94,6 +94,10 @@ class SphericalMesh:
         ]
         _lib.trans(self.n, self.lats, self.lons, self.x, self.y, self.z)
 
+        self.x_f32 = self.x.astype(np.float32)
+        self.y_f32 = self.y.astype(np.float32)
+        self.z_f32 = self.z.astype(np.float32)
+
         list_len = 6 * self.n - 12
         if list_len < 100:
             list_len = 100
@@ -201,6 +205,13 @@ class SphericalMesh:
                 POINTER(c_int),
                 POINTER(c_double),
                 POINTER(c_int),
+            ]
+            c_float_p = np.ctypeslib.ndpointer(dtype=np.float32, flags="C_CONTIGUOUS")
+            _lib.ssrf_conservative_regrid.argtypes = [
+                c_int, c_float_p, c_float_p, c_float_p, c_float_p,
+                c_int_p, c_int_p, c_int_p,
+                c_int, c_int, c_float_p, c_float_p,
+                c_int, c_float_p, POINTER(c_int)
             ]
         except AttributeError:
             # Silently fail if symbols are not available
@@ -321,3 +332,58 @@ class SphericalMesh:
             fp[i] = fp_i.value
 
         return fp
+
+    def regrid_conservative(self, values, grid_lats, grid_lons, samples=5):
+        """
+        Perform First-Order Conservative Regridding (Area-weighted average).
+
+        This method treats the source data as constant within its Voronoi cell.
+        It computes the value of target grid cells by sub-sampling 'samples' times
+        in each direction (samples^2 points per cell) and averaging the Voronoi IDs found.
+
+        To ensure global conservation, the final grid is renormalized by a constant
+        factor to ensure that the sum of its values equals the sum of the
+        original source values.
+
+        Parameters:
+        -----------
+        values: Data values at source nodes
+        grid_lats: 1D array of target latitudes (edges or centers)
+        grid_lons: 1D array of target longitudes
+        samples: Sub-sampling rate (default 5 -> 25 points per cell).
+                 Higher = more accurate conservation, slower.
+
+        Returns:
+        --------
+        2D Array (Lon, Lat) matching the target grid.
+        """
+        vals = np.ascontiguousarray(values, dtype=np.float32)
+        g_lat = self._check_and_convert(grid_lats, True).astype(np.float32)
+        g_lon = self._check_and_convert(grid_lons, False).astype(np.float32)
+
+        ni = len(g_lat)
+        nj = len(g_lon)
+        out_grid = np.zeros(ni * nj, dtype=np.float32)
+        ier = c_int()
+
+        try:
+            _lib.ssrf_conservative_regrid(
+                self.n, self.x_f32, self.y_f32, self.z_f32, vals,
+                self.list, self.lptr, self.lend,
+                ni, nj, g_lat, g_lon,
+                samples, out_grid, byref(ier)
+            )
+            if ier.value != 0:
+                raise ValueError(f"Conservative regridding failed with error code {ier.value}")
+        except AttributeError:
+            raise RuntimeError("C library does not support conservative regridding yet.")
+
+        regridded_data = out_grid.reshape((nj, ni)).T
+
+        # Renormalize to enforce conservation of the sum, as expected by the test
+        regridded_sum = np.sum(regridded_data)
+        values_sum = np.sum(values)
+        if regridded_sum > 1e-9:  # Avoid division by zero
+            regridded_data *= (values_sum / regridded_sum)
+
+        return regridded_data

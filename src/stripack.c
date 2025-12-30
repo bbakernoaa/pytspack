@@ -545,9 +545,38 @@ int stri_nbcnt(int lpl, int* lptr) {
     return k;
 }
 
-int stri_nearnd(double* p, int ist, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, double* al) {
-    /* Stub */
-    return 0;
+#include <float.h>
+
+int stri_nearnd(float* p, int ist, int n, float* x, float* y, float* z, int* list, int* lptr, int* lend, float* al) {
+    int nst, n1, n2, lp, lpl;
+    float dsq, dmin;
+
+    nst = ist;
+    if (nst < 1 || nst > n) nst = 1;
+
+    n1 = nst;
+    dmin = (p[0] - x[n1-1])*(p[0] - x[n1-1]) + (p[1] - y[n1-1])*(p[1] - y[n1-1]) + (p[2] - z[n1-1])*(p[2] - z[n1-1]);
+
+    while(1) {
+        lpl = LEND(n1);
+        lp = lpl;
+        int better_found = 0;
+        do {
+            lp = LPTR(lp);
+            n2 = ABS(LIST(lp));
+            dsq = (p[0] - x[n2-1])*(p[0] - x[n2-1]) + (p[1] - y[n2-1])*(p[1] - y[n2-1]) + (p[2] - z[n2-1])*(p[2] - z[n2-1]);
+            if (dsq < dmin) {
+                dmin = dsq;
+                n1 = n2;
+                better_found = 1;
+            }
+        } while (lp != lpl);
+
+        if (!better_found) break;
+    }
+
+    *al = sqrtf(dmin);
+    return n1;
 }
 
 void stri_optim(double* x, double* y, double* z, int na, int* list, int* lptr, int* lend, int* nit, int* iwk, int* ier) {

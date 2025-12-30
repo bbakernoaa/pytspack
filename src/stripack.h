@@ -27,7 +27,7 @@ int stri_jrand(int n, int* ix, int* iy, int* iz);
 int stri_left(double x1, double y1, double z1, double x2, double y2, double z2, double x0, double y0, double z0);
 int stri_lstptr(int lpl, int nb, int* list, int* lptr);
 int stri_nbcnt(int lpl, int* lptr);
-int stri_nearnd(double* p, int ist, int n, double* x, double* y, double* z, int* list, int* lptr, int* lend, double* al);
+int stri_nearnd(float* p, int ist, int n, float* x, float* y, float* z, int* list, int* lptr, int* lend, float* al);
 void stri_optim(double* x, double* y, double* z, int na, int* list, int* lptr, int* lend, int* nit, int* iwk, int* ier);
 double stri_store(double x);
 void stri_swap(int in1, int in2, int io1, int io2, int* list, int* lptr, int* lend, int* lp21);
