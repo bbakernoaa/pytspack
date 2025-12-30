@@ -74,7 +74,7 @@ class TsPack:
 
 
 class SphericalMesh:
-    def __init__(self, lats, lons):
+    def __init__(self, lats: np.ndarray, lons: np.ndarray):
         self.n = len(lats)
         self.lats = self._check_and_convert(lats, is_lat=True)
         self.lons = self._check_and_convert(lons, is_lat=False)
@@ -84,42 +84,23 @@ class SphericalMesh:
         self.y = np.zeros(self.n, dtype=np.float64)
         self.z = np.zeros(self.n, dtype=np.float64)
 
-        _lib.trans.argtypes = [
-            c_int,
-            c_double_p,
-            c_double_p,
-            c_double_p,
-            c_double_p,
-            c_double_p,
-        ]
+        self._bind()  # Centralized C-function binding
+
         _lib.trans(self.n, self.lats, self.lons, self.x, self.y, self.z)
 
+        # Cache float32 versions for conservative regridding
         self.x_f32 = self.x.astype(np.float32)
         self.y_f32 = self.y.astype(np.float32)
         self.z_f32 = self.z.astype(np.float32)
 
         list_len = 6 * self.n - 12
         if list_len < 100:
-            list_len = 100
+            list_len = 100  # Minimum size for STRIPACK
         self.list = np.zeros(list_len, dtype=np.int32)
         self.lptr = np.zeros(list_len, dtype=np.int32)
         self.lend = np.zeros(self.n, dtype=np.int32)
-
-        try:
-            _lib.stri_trmesh.argtypes = [
-                c_int,
-                c_double_p,
-                c_double_p,
-                c_double_p,
-                c_int_p,
-                c_int_p,
-                c_int_p,
-                POINTER(c_int),
-            ]
-        except AttributeError:
-            raise ImportError("stri_trmesh function not found in library.")
-
         ier = c_int()
+
         _lib.stri_trmesh(
             self.n,
             self.x,
@@ -133,43 +114,51 @@ class SphericalMesh:
 
         if ier.value != 0:
             raise RuntimeError(f"STRIPACK TRMESH Error: {ier.value}")
-        self._bind()
 
-    def _check_and_convert(self, arr, is_lat=False):
+    def _check_and_convert(self, arr: np.ndarray, is_lat: bool = False) -> np.ndarray:
         arr = np.ascontiguousarray(arr, dtype=np.float64)
         max_val = np.nanmax(np.abs(arr))
+        # Heuristic to detect if input is degrees and convert to radians
         if (is_lat and max_val > 1.6) or (not is_lat and max_val > 6.3):
             return np.deg2rad(arr)
         return arr
 
-    def _bind(self):
+    def _bind(self) -> None:
+        """
+        Binds the required C functions from the shared library to this
+        class instance. This method sets the `argtypes` for each C
+        function to ensure type safety and performance. This is done
+        once at initialization.
+        """
+        # --- Coordinate Transformations ---
         try:
-            _lib.unif.argtypes = [
+            _lib.trans.argtypes = [
                 c_int,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+            ]
+        except AttributeError:
+            raise ImportError("Coordinate transformation function `trans` not found.")
+
+        # --- STRIPACK (Triangulation) ---
+        try:
+            _lib.stri_trmesh.argtypes = [
+                c_int,
+                c_double_p,
+                c_double_p,
+                c_double_p,
                 c_int_p,
-                c_int,
-                c_double_p,
-                c_double_p,
-                c_double_p,
-                c_double_p,
                 c_int_p,
                 c_int_p,
-                c_int_p,
-                c_int,
-                c_double_p,
-                c_int,
-                c_int,
-                c_int,
-                c_double_p,
-                c_double_p,
-                c_int,
-                c_double,
-                c_double_p,
                 POINTER(c_int),
             ]
         except AttributeError:
-            pass
+            raise ImportError("`stri_trmesh` function not found in library.")
 
+        # --- SSRFPACK (Interpolation & Gradients) ---
         try:
             _lib.ssrf_gradg.argtypes = [
                 c_int,
@@ -206,6 +195,12 @@ class SphericalMesh:
                 POINTER(c_double),
                 POINTER(c_int),
             ]
+        except AttributeError:
+            # This is not a fatal error, as not all users will need interpolation
+            pass
+
+        # --- SSRFPACK (Conservative Regridding) ---
+        try:
             c_float_p = np.ctypeslib.ndpointer(dtype=np.float32, flags="C_CONTIGUOUS")
             _lib.ssrf_conservative_regrid.argtypes = [
                 c_int,
@@ -225,7 +220,35 @@ class SphericalMesh:
                 POINTER(c_int),
             ]
         except AttributeError:
-            # Silently fail if symbols are not available
+            # Not a fatal error, as not all users will need this function
+            pass
+
+        # --- UNIF (Uniform Grid) - Potentially unused but defined for completeness ---
+        try:
+            _lib.unif.argtypes = [
+                c_int,
+                c_int_p,
+                c_int,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_int_p,
+                c_int_p,
+                c_int_p,
+                c_int,
+                c_double_p,
+                c_int,
+                c_int,
+                c_int,
+                c_double_p,
+                c_double_p,
+                c_int,
+                c_double,
+                c_double_p,
+                POINTER(c_int),
+            ]
+        except AttributeError:
             pass
 
     def interpolate(
@@ -275,20 +298,53 @@ class SphericalMesh:
         # Reshape the 1D result back to the 2D grid shape
         return interpolated_values.reshape(len(grid_lats), len(grid_lons))
 
-    def interpolate_points(self, values, point_lats, point_lons):
-        """Curvilinear (point-based) Grid Interpolation"""
+    def interpolate_points(
+        self, values: np.ndarray, point_lats: np.ndarray, point_lons: np.ndarray
+    ) -> np.ndarray:
+        """
+        Interpolates data from the source mesh to a set of target points.
+
+        This is the core interpolation function that operates on unstructured
+        target points (e.g., satellite tracks, ship tracks). It computes
+        gradients on the source mesh and then performs point-wise
+        interpolation using the Renka C library functions.
+
+        Parameters
+        ----------
+        values : np.ndarray
+            A 1D array of data values at the source mesh nodes (`self.lats`,
+            `self.lons`). Must have length `n`.
+        point_lats : np.ndarray
+            A 1D array of latitude coordinates for the target points.
+        point_lons : np.ndarray
+            A 1D array of longitude coordinates for the target points. Must
+            have the same length as `point_lats`.
+
+        Returns
+        -------
+        np.ndarray
+            A 1D array of interpolated values at the target points.
+
+        Raises
+        ------
+        ValueError
+            If `point_lats` and `point_lons` have different lengths.
+        RuntimeError
+            If the underlying C functions for gradient calculation or
+            interpolation return an error.
+        """
         vals = np.ascontiguousarray(values, dtype=np.float64)
-        p_lat = self._check_and_convert(point_lats, True)
-        p_lon = self._check_and_convert(point_lons, False)
+        p_lat = self._check_and_convert(point_lats, is_lat=True)
+        p_lon = self._check_and_convert(point_lons, is_lat=False)
         n_pts = len(p_lat)
         if n_pts != len(p_lon):
             raise ValueError("point_lats and point_lons must have the same size.")
 
-        # 1. Compute gradients
-        sigma = np.zeros(self.n, dtype=np.float64)
+        # 1. Compute gradients at the source nodes
+        sigma = np.zeros(self.n, dtype=np.float64)  # Tension factors
         grad = np.zeros(3 * self.n, dtype=np.float64)
         ier = c_int()
-        nit = c_int(20)
+        nit = c_int(20)  # Max iterations for gradient estimation
         dgmax = c_double(0.0)
 
         _lib.ssrf_gradg(
@@ -310,9 +366,9 @@ class SphericalMesh:
         if ier.value < 0:
             raise RuntimeError(f"ssrf_gradg failed with error code {ier.value}")
 
-        # 2. Interpolate at each point
+        # 2. Interpolate at each target point (unavoidable loop)
         fp = np.zeros(n_pts, dtype=np.float64)
-        ist = c_int(1)
+        ist = c_int(1)  # Start search at node 1
 
         for i in range(n_pts):
             fp_i = c_double(0.0)
@@ -329,7 +385,7 @@ class SphericalMesh:
                 self.lend,
                 0,
                 sigma,
-                1,
+                1,  # Use gradients
                 grad,
                 byref(ist),
                 byref(fp_i),
