@@ -195,6 +195,25 @@ class SphericalMesh:
                 POINTER(c_double),
                 POINTER(c_int),
             ]
+            _lib.ssrf_intrc1_vec.argtypes = [
+                c_int,
+                c_int,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_int_p,
+                c_int_p,
+                c_int_p,
+                c_int,
+                c_double_p,
+                c_int,
+                c_double_p,
+                c_double_p,
+                c_int_p,
+            ]
         except AttributeError:
             # This is not a fatal error, as not all users will need interpolation
             pass
@@ -301,6 +320,11 @@ class SphericalMesh:
     def interpolate_points(
         self, values: np.ndarray, point_lats: np.ndarray, point_lons: np.ndarray
     ) -> np.ndarray:
+        return self.interpolate_points_vec(values, point_lats, point_lons)
+
+    def interpolate_points_vec(
+        self, values: np.ndarray, point_lats: np.ndarray, point_lons: np.ndarray
+    ) -> np.ndarray:
         """
         Interpolates data from the source mesh to a set of target points.
 
@@ -366,38 +390,34 @@ class SphericalMesh:
         if ier.value < 0:
             raise RuntimeError(f"ssrf_gradg failed with error code {ier.value}")
 
-        # 2. Interpolate at each target point (unavoidable loop)
+        # 2. Interpolate at each target point (vectorized)
         fp = np.zeros(n_pts, dtype=np.float64)
-        ist = c_int(1)  # Start search at node 1
-
-        for i in range(n_pts):
-            fp_i = c_double(0.0)
-            _lib.ssrf_intrc1(
-                self.n,
-                p_lat[i],
-                p_lon[i],
-                self.x,
-                self.y,
-                self.z,
-                vals,
-                self.list,
-                self.lptr,
-                self.lend,
-                0,
-                sigma,
-                1,  # Use gradients
-                grad,
-                byref(ist),
-                byref(fp_i),
-                byref(ier),
+        ier_vec = np.zeros(n_pts, dtype=np.int32)
+        _lib.ssrf_intrc1_vec(
+            self.n,
+            n_pts,
+            p_lat,
+            p_lon,
+            self.x,
+            self.y,
+            self.z,
+            vals,
+            self.list,
+            self.lptr,
+            self.lend,
+            0,
+            sigma,
+            1,  # Use gradients
+            grad,
+            fp,
+            ier_vec,
+        )
+        if np.any(ier_vec < 0):
+            # Find first error
+            err_idx = np.where(ier_vec < 0)[0][0]
+            raise RuntimeError(
+                f"ssrf_intrc1_vec failed at point {err_idx} with error code {ier_vec[err_idx]}"
             )
-            if ier.value < 0:
-                # Non-fatal errors (e.g., extrapolation) are positive
-                raise RuntimeError(
-                    f"ssrf_intrc1 failed at point {i} with error code {ier.value}"
-                )
-            fp[i] = fp_i.value
-
         return fp
 
     def regrid_conservative(self, values, grid_lats, grid_lons, samples=5):
