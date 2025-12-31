@@ -24,7 +24,7 @@ def test_sphericalmesh_interpolate():
     grid_lons = np.linspace(-95, -85, 11)
 
     # Perform interpolation
-    interpolated_data = mesh.interpolate(values, grid_lats, grid_lons).compute()
+    interpolated_data = mesh.interpolate(values, grid_lats, grid_lons)
 
     # 1. Check the output shape
     assert interpolated_data.shape == (16, 11), "Output array shape is incorrect."

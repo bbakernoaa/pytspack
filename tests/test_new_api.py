@@ -30,10 +30,9 @@ class TestNewApi(unittest.TestCase):
         grid_lons = np.array([5.0, 15.0])
 
         results = mesh.interpolate(values, grid_lats, grid_lons)
-        computed_results = results.compute()
 
-        self.assertEqual(computed_results.shape, (2, 2))
-        self.assertTrue(np.all(np.isfinite(computed_results)))
+        self.assertEqual(results.shape, (2, 2))
+        self.assertTrue(np.all(np.isfinite(results)))
 
     def test_spherical_mesh_points_interpolation(self):
         """Test SphericalMesh point interpolation."""

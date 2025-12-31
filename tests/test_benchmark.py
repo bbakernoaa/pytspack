@@ -16,8 +16,7 @@ def test_benchmark_interpolate_scaling_source(benchmark, source_size):
 
     grid_lats = np.linspace(-90, 90, 100)
     grid_lons = np.linspace(0, 360, 100)
-    result = mesh.interpolate(values, grid_lats, grid_lons)
-    benchmark(result.compute)
+    benchmark(mesh.interpolate, values, grid_lats, grid_lons)
 
 
 @pytest.mark.parametrize("grid_size", [10, 50, 100])
@@ -32,8 +31,7 @@ def test_benchmark_interpolate_scaling_grid(benchmark, grid_size):
 
     grid_lats = np.linspace(-90, 90, grid_size)
     grid_lons = np.linspace(0, 360, grid_size)
-    result = mesh.interpolate(values, grid_lats, grid_lons)
-    benchmark(result.compute)
+    benchmark(mesh.interpolate, values, grid_lats, grid_lons)
 
 
 @pytest.mark.parametrize("source_size", [10, 100, 1000])
