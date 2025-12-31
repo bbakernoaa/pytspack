@@ -1,0 +1,7 @@
+hvplot
+cartopy
+pydeck
+xarray
+dask
+renka
+pygeotools

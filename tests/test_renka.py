@@ -1,9 +1,11 @@
 import numpy as np
 import pytest
+import xarray as xr
 from renka.renka import SphericalMesh
+import dask.array as da
 
 
-def test_sphericalmesh_interpolate():
+def test_sphericalmesh_interpolate_numpy():
     """
     Tests the SphericalMesh.interpolate method.
 
@@ -25,7 +27,7 @@ def test_sphericalmesh_interpolate():
     grid_lons = np.linspace(-95, -85, 11)
 
     # Perform interpolation
-    interpolated_data = mesh.interpolate(values, grid_lats, grid_lons)
+    interpolated_data = mesh.interpolate_to_xarray(values, grid_lats, grid_lons)
 
     # 1. Check the output shape
     assert interpolated_data.shape == (16, 11), "Output array shape is incorrect."
@@ -46,6 +48,68 @@ def test_sphericalmesh_interpolate():
     # 3. Check for NaN values in the interior
     # The result may have NaNs on the boundary, but the interior should be finite.
     interior_view = interpolated_data[1:-1, 1:-1]
+    assert not np.isnan(interior_view).any(), (
+        "Interpolated data contains NaNs in its interior."
+    )
+
+
+def test_sphericalmesh_interpolate_xarray_dask():
+    """
+    Tests the SphericalMesh.interpolate method with xarray and Dask.
+
+    This test verifies that the interpolation function:
+    1. Accepts a Dask-chunked xarray DataArray as input.
+    2. Returns a Dask-backed xarray DataArray (lazy computation).
+    3. Produces numerically correct results when computed.
+    """
+    # 1. Source Data (unstructured)
+    lats = np.array([30.0, 45.0, 35.0, 40.0])
+    lons = np.array([-90.0, -85.0, -95.0, -90.0])
+    values = np.array([10.0, 20.0, 15.0, 18.0])
+
+    # Create an xarray DataArray for the source data, chunked with Dask
+    ds_in = xr.DataArray(
+        da.from_array(values, chunks=(2,)),
+        coords={
+            "lat": (("points",), lats),
+            "lon": (("points",), lons),
+        },
+        dims=["points"],
+        name="temperature",
+    ).chunk({"points": -1})
+
+    # Initialize the spherical mesh from the source coordinates
+    mesh = SphericalMesh(ds_in["lat"].values, ds_in["lon"].values)
+
+    # 2. Target Grid (structured)
+    grid_lats = np.linspace(30, 45, 16)
+    grid_lons = np.linspace(-95, -85, 11)
+    ds_out = xr.Dataset(coords={"lat": grid_lats, "lon": grid_lons})
+
+    # 3. Perform lazy interpolation
+    interpolated_da = mesh.interpolate(ds_in, ds_out)
+
+    # 4. Verification
+    # Check if the output is a Dask array (lazy)
+    assert isinstance(interpolated_da.data, da.Array), "Output should be a Dask array."
+
+    # Check output coordinates
+    assert "lat" in interpolated_da.coords
+    assert "lon" in interpolated_da.coords
+    assert interpolated_da.shape == (16, 11), "Output array shape is incorrect."
+
+    # Compute the result
+    computed_data = interpolated_da.compute()
+
+    # Check a specific interpolated value
+    lat_idx = np.abs(grid_lats - 40.0).argmin()
+    lon_idx = np.abs(grid_lons - -90.0).argmin()
+    assert np.isclose(computed_data[lat_idx, lon_idx], 18.0, atol=1e-9), (
+        "Interpolated value at a known point is not as expected."
+    )
+
+    # Check for NaNs
+    interior_view = computed_data.values[1:-1, 1:-1]
     assert not np.isnan(interior_view).any(), (
         "Interpolated data contains NaNs in its interior."
     )

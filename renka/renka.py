@@ -1,5 +1,6 @@
 import ctypes
 import numpy as np
+import xarray as xr
 import os
 import importlib.util
 from ctypes import c_int, c_double, POINTER, byref
@@ -270,21 +271,104 @@ class SphericalMesh:
         except AttributeError:
             pass
 
-    def interpolate(
+    def interpolate(self, da: "xr.DataArray", ds_out: "xr.Dataset") -> "xr.DataArray":
+        """Interpolates unstructured data onto a structured grid using Dask.
+
+        This method leverages `xarray.apply_ufunc` to perform lazy, parallel
+        interpolation from an unstructured source `DataArray` to a structured
+        target `Dataset`. The core computation is handled by a C-based
+        library, ensuring high performance.
+
+        The source data (`da`) must have a "points" dimension and corresponding
+        "lat" and "lon" coordinates. The target dataset (`ds_out`) must
+        contain 1D "lat" and "lon" coordinate variables defining the grid.
+
+        Parameters
+        ----------
+        da : xr.DataArray
+            The source data on an unstructured grid. Must contain a dimension
+            named "points" and coordinates "lat" and "lon" associated with
+            this dimension. For Dask integration, this array should be chunked
+            as a single block along the "points" dimension (e.g., `.chunk({"points": -1})`).
+        ds_out : xr.Dataset
+            The target dataset defining the structured output grid. It must
+            contain 1D coordinate variables "lat" and "lon".
+
+        Returns
+        -------
+        xr.DataArray
+            A new `DataArray` containing the interpolated data on the
+            structured grid defined by `ds_out`. The computation is lazy if
+            the input array is backed by Dask.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> import xarray as xr
+        >>> import dask.array as da
+        >>> from renka import SphericalMesh
+        >>>
+        >>> # 1. Source Data (unstructured)
+        >>> lats = np.array([30.0, 45.0, 35.0, 40.0])
+        >>> lons = np.array([-90.0, -85.0, -95.0, -90.0])
+        >>> values = np.array([10.0, 20.0, 15.0, 18.0])
+        >>> source_da = xr.DataArray(
+        ...     da.from_array(values, chunks=-1),
+        ...     coords={"lat": ("points", lats), "lon": ("points", lons)},
+        ...     dims="points",
+        ... ).chunk({"points": -1})
+        >>>
+        >>> # 2. Target Grid (structured)
+        >>> grid_lats = np.linspace(30, 45, 16)
+        >>> grid_lons = np.linspace(-95, -85, 11)
+        >>> target_ds = xr.Dataset(coords={"lat": grid_lats, "lon": grid_lons})
+        >>>
+        >>> # 3. Interpolation
+        >>> mesh = SphericalMesh(source_da["lat"].values, source_da["lon"].values)
+        >>> interpolated_da = mesh.interpolate(source_da, target_ds)
+        >>> print(interpolated_da.shape)
+        (16, 11)
+        """
+
+        def _interpolate_grid(values, grid_lats, grid_lons):
+            """Core interpolation function for use with apply_ufunc."""
+            lon_grid, lat_grid = np.meshgrid(grid_lons, grid_lats)
+            flat_lats = lat_grid.flatten()
+            flat_lons = lon_grid.flatten()
+
+            interpolated_flat = self.interpolate_points_vec(
+                values, flat_lats, flat_lons
+            )
+            return interpolated_flat.reshape(lat_grid.shape)
+
+        # This defines the function signature for dask's map_blocks
+        return xr.apply_ufunc(
+            _interpolate_grid,
+            da,
+            ds_out["lat"],
+            ds_out["lon"],
+            input_core_dims=[["points"], ["lat"], ["lon"]],
+            output_core_dims=[["lat", "lon"]],
+            dask="parallelized",
+            output_dtypes=[da.dtype],
+        ).assign_coords(ds_out.coords)
+
+    def interpolate_to_xarray(
         self,
         values: np.ndarray,
         grid_lats: np.ndarray,
         grid_lons: np.ndarray,
     ) -> np.ndarray:
-        """Interpolates data onto a rectilinear grid.
+        """Interpolates data onto a rectilinear grid (NumPy implementation).
 
         This method is a convenience wrapper around `interpolate_points`. It
         constructs a grid, flattens it, performs the point-wise
         interpolation, and then reshapes the result back into a 2D grid.
 
         .. warning::
-           This function can be slow for large grids due to the underlying
-           loop in `interpolate_points`.
+           This function loads the entire grid into memory and is not
+           recommended for large datasets. Use the xarray-based `interpolate`
+           method for lazy, out-of-core computation.
 
         Parameters
         ----------
