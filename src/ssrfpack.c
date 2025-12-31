@@ -1192,3 +1192,19 @@ void ssrf_conservative_regrid(int n, float *x, float *y, float *z, float *vals,
     }
     *ier = err;
 }
+
+void ssrf_intrc_grid(int n, double* x, double* y, double* z, double* f,
+                     int* list, int* lptr, int* lend, int iflgs,
+                     double* sigma, int iflgg, double* grad, int n_pts,
+                     double* p_lat, double* p_lon, double* fp, int* ier) {
+    int i;
+    int ist = 1;
+    for (i = 0; i < n_pts; ++i) {
+        ssrf_intrc1(n, p_lat[i], p_lon[i], x, y, z, f, list, lptr,
+                    lend, iflgs, sigma, iflgg, grad, &ist, &fp[i],
+                    ier);
+        if (*ier < 0) {
+            return;
+        }
+    }
+}

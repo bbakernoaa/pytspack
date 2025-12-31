@@ -31,6 +31,10 @@ void ssrf_smsgs(int n, double* x, double* y, double* z, double* u, int* list, in
 void ssrf_smsurf(int n, double* x, double* y, double* z, double* u, int* list, int* lptr, int* lend, int iflgs, double* sigma, double* w, double sm, double smtol, double gstol, int lprnt, double* f, double* grad, int* ier);
 void ssrf_snhcsh(double x, double* sinhm, double* coshm, double* coshmm);
 void ssrf_unif(int n, double* x, double* y, double* z, double* f, int* list, int* lptr, int* lend, int iflgs, double* sigma, int nrow, int ni, int nj, double* plat, double* plon, int iflgg, double* grad, double* ff, int* ier);
+void ssrf_intrc_grid(int n, double* x, double* y, double* z, double* f,
+                     int* list, int* lptr, int* lend, int iflgs,
+                     double* sigma, int iflgg, double* grad, int n_pts,
+                     double* p_lat, double* p_lon, double* fp, int* ier);
 
 #ifdef __cplusplus
 }

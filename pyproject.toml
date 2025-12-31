@@ -12,7 +12,8 @@ license = {text = "MIT"}
 dependencies = [
     "numpy>=1.21.0",
     "xarray",
-    "dask"
+    "dask",
+    "distributed"
 ]
 
 [project.optional-dependencies]

@@ -196,6 +196,25 @@ class SphericalMesh:
                 POINTER(c_double),
                 POINTER(c_int),
             ]
+            _lib.ssrf_intrc_grid.argtypes = [
+                c_int,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                c_int_p,
+                c_int_p,
+                c_int_p,
+                c_int,
+                c_double_p,
+                c_int,
+                c_double_p,
+                c_int,
+                c_double_p,
+                c_double_p,
+                c_double_p,
+                POINTER(c_int),
+            ]
         except AttributeError:
             # This is not a fatal error, as not all users will need interpolation
             pass
@@ -264,6 +283,9 @@ class SphericalMesh:
         to parallelize the interpolation. It constructs a grid, and then
         applies the point-wise interpolation over chunks of the grid.
 
+        For significant performance gains on large grids, it is recommended
+        to create a `dask.distributed.Client` before calling this method.
+
         Parameters
         ----------
         values : np.ndarray
@@ -284,6 +306,7 @@ class SphericalMesh:
         values = np.ascontiguousarray(values, dtype=np.float64)
 
         def _interpolate_chunk(lat_chunk, lon_chunk):
+            self._bind()  # Re-bind in the Dask worker
             shape = lat_chunk.shape
             dims = lat_chunk.dims
             if shape == (0,):
@@ -394,37 +417,31 @@ class SphericalMesh:
         if ier.value < 0:
             raise RuntimeError(f"ssrf_gradg failed with error code {ier.value}")
 
-        # 2. Interpolate at each target point (unavoidable loop)
+        # 2. Interpolate at all target points with a single C call
         fp = np.zeros(n_pts, dtype=np.float64)
-        ist = c_int(1)  # Start search at node 1
-
-        for i in range(n_pts):
-            fp_i = c_double(0.0)
-            _lib.ssrf_intrc1(
-                self.n,
-                p_lat[i],
-                p_lon[i],
-                self.x,
-                self.y,
-                self.z,
-                vals,
-                self.list,
-                self.lptr,
-                self.lend,
-                0,
-                sigma,
-                1,  # Use gradients
-                grad,
-                byref(ist),
-                byref(fp_i),
-                byref(ier),
+        _lib.ssrf_intrc_grid(
+            self.n,
+            self.x,
+            self.y,
+            self.z,
+            vals,
+            self.list,
+            self.lptr,
+            self.lend,
+            0,
+            sigma,
+            1,  # Use gradients
+            grad,
+            n_pts,
+            p_lat,
+            p_lon,
+            fp,
+            byref(ier),
+        )
+        if ier.value < 0:
+            raise RuntimeError(
+                f"ssrf_intrc_grid failed with error code {ier.value}"
             )
-            if ier.value < 0:
-                # Non-fatal errors (e.g., extrapolation) are positive
-                raise RuntimeError(
-                    f"ssrf_intrc1 failed at point {i} with error code {ier.value}"
-                )
-            fp[i] = fp_i.value
 
         return fp
 
