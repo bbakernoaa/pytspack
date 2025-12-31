@@ -65,10 +65,8 @@ def test_spherical_mesh_interpolate_points_vec():
     # To test the original, non-vectorized implementation, we can call it directly
     # by creating a temporary, non-vectorized version of the interpolation method
     import types
-    original_interpolate = types.MethodType(
-        _original_interpolate_points,
-        mesh
-    )
+
+    original_interpolate = types.MethodType(_original_interpolate_points, mesh)
     original_values = original_interpolate(
         values=source_values,
         point_lats=target_lats,
@@ -80,7 +78,7 @@ def test_spherical_mesh_interpolate_points_vec():
         original_values,
         rtol=1e-12,
         atol=1e-12,
-        err_msg="Vectorized interpolation does not match original."
+        err_msg="Vectorized interpolation does not match original.",
     )
 
 
@@ -105,8 +103,20 @@ def _original_interpolate_points(
     dgmax = ctypes.c_double(0.0)
 
     _lib.ssrf_gradg(
-        self.n, self.x, self.y, self.z, vals, self.list, self.lptr, self.lend,
-        0, sigma, ctypes.byref(nit), ctypes.byref(dgmax), grad, ctypes.byref(ier)
+        self.n,
+        self.x,
+        self.y,
+        self.z,
+        vals,
+        self.list,
+        self.lptr,
+        self.lend,
+        0,
+        sigma,
+        ctypes.byref(nit),
+        ctypes.byref(dgmax),
+        grad,
+        ctypes.byref(ier),
     )
     if ier.value < 0:
         raise RuntimeError(f"ssrf_gradg failed with error code {ier.value}")
@@ -117,12 +127,28 @@ def _original_interpolate_points(
     for i in range(n_pts):
         fp_i = ctypes.c_double(0.0)
         _lib.ssrf_intrc1(
-            self.n, p_lat[i], p_lon[i], self.x, self.y, self.z, vals,
-            self.list, self.lptr, self.lend, 0, sigma, 1, grad,
-            ctypes.byref(ist), ctypes.byref(fp_i), ctypes.byref(ier)
+            self.n,
+            p_lat[i],
+            p_lon[i],
+            self.x,
+            self.y,
+            self.z,
+            vals,
+            self.list,
+            self.lptr,
+            self.lend,
+            0,
+            sigma,
+            1,
+            grad,
+            ctypes.byref(ist),
+            ctypes.byref(fp_i),
+            ctypes.byref(ier),
         )
         if ier.value < 0:
-            raise RuntimeError(f"ssrf_intrc1 failed at point {i} with error {ier.value}")
+            raise RuntimeError(
+                f"ssrf_intrc1 failed at point {i} with error {ier.value}"
+            )
         fp[i] = fp_i.value
 
     return fp
