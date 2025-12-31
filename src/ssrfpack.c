@@ -1192,3 +1192,12 @@ void ssrf_conservative_regrid(int n, float *x, float *y, float *z, float *vals,
     }
     *ier = err;
 }
+
+void ssrf_intrc1_vec(int n, int n_pts, double* plat, double* plon, double* x, double* y, double* z, double* f, int* list, int* lptr, int* lend, int iflgs, double* sigma, int iflgg, double* grad, double* fp, int* ier_vec) {
+    int ist = 1;
+    for (int i = 0; i < n_pts; i++) {
+        int ier = 0;
+        ssrf_intrc1(n, plat[i], plon[i], x, y, z, f, list, lptr, lend, iflgs, sigma, iflgg, grad, &ist, &fp[i], &ier);
+        ier_vec[i] = ier;
+    }
+}
