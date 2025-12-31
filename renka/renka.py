@@ -1,5 +1,6 @@
 import ctypes
 import numpy as np
+import xarray as xr
 import os
 import importlib.util
 from ctypes import c_int, c_double, POINTER, byref
@@ -256,47 +257,74 @@ class SphericalMesh:
         values: np.ndarray,
         grid_lats: np.ndarray,
         grid_lons: np.ndarray,
-    ) -> np.ndarray:
-        """Interpolates data onto a rectilinear grid.
+    ) -> "xr.DataArray":
+        """Interpolates data onto a rectilinear grid using Dask.
 
-        This method is a convenience wrapper around `interpolate_points`. It
-        constructs a grid, flattens it, performs the point-wise
-        interpolation, and then reshapes the result back into a 2D grid.
-
-        .. warning::
-           This function can be slow for large grids due to the underlying
-           loop in `interpolate_points`.
+        This method is a convenience wrapper that uses `xarray` and `dask`
+        to parallelize the interpolation. It constructs a grid, and then
+        applies the point-wise interpolation over chunks of the grid.
 
         Parameters
         ----------
         values : np.ndarray
             A 1D NumPy array of data values corresponding to the input `lats`
-            and `lons` used to initialize the `SphericalMesh`. The array
-            length must be equal to `n`.
+            and `lons` used to initialize the `SphericalMesh`.
         grid_lats : np.ndarray
-            A 1D NumPy array specifying the latitude coordinates of the
-            output grid. Values can be in degrees or radians.
+            A 1D NumPy array for the latitude coordinates of the output grid.
         grid_lons : np.ndarray
-            A 1D NumPy array specifying the longitude coordinates of the
-            output grid. Values can be in degrees or radians.
+            A 1D NumPy array for the longitude coordinates of the output grid.
 
         Returns
         -------
-        np.ndarray
-            A 2D NumPy array of shape `(len(grid_lats), len(grid_lons))`
-            containing the interpolated values. Points outside the convex
-            hull of the data will be `np.nan`.
+        xr.DataArray
+            A 2D xarray DataArray with the interpolated values. If the input
+            grid coordinates are backed by dask, the computation will be lazy.
         """
-        # Create a meshgrid and flatten it for point-wise interpolation
-        lon_grid, lat_grid = np.meshgrid(grid_lons, grid_lats)
-        flat_lats = lat_grid.flatten()
-        flat_lons = lon_grid.flatten()
+        # Ensure values are a contiguous array for the C functions
+        values = np.ascontiguousarray(values, dtype=np.float64)
 
-        # Interpolate at the flattened points
-        interpolated_values = self.interpolate_points(values, flat_lats, flat_lons)
+        def _interpolate_chunk(lat_chunk, lon_chunk):
+            shape = lat_chunk.shape
+            dims = lat_chunk.dims
+            if shape == (0,):
+                return xr.DataArray(np.array([], dtype=np.float64))
 
-        # Reshape the 1D result back to the 2D grid shape
-        return interpolated_values.reshape(len(grid_lats), len(grid_lons))
+            flat_lats = np.asarray(lat_chunk).flatten()
+            flat_lons = np.asarray(lon_chunk).flatten()
+            result_flat = self.interpolate_points(values, flat_lats, flat_lons)
+            coords = {d: c for d, c in lat_chunk.coords.items() if d in dims}
+            return xr.DataArray(result_flat.reshape(shape),
+                                coords=coords,
+                                dims=dims)
+
+        # Create DataArrays for coordinates
+        da_lats = xr.DataArray(grid_lats, dims=["lat"], coords={"lat": grid_lats})
+        da_lons = xr.DataArray(grid_lons, dims=["lon"], coords={"lon": grid_lons})
+
+        # Create a template for xr.map_blocks
+        template = xr.DataArray(
+            np.nan,
+            dims=["lat", "lon"],
+            coords={"lat": grid_lats, "lon": grid_lons},
+        ).chunk()
+
+        # Broadcast coordinates to a grid and chunk them.
+        grid_lon_da, grid_lat_da = xr.broadcast(da_lons, da_lats)
+
+        # Ensure correct dimension order before chunking
+        grid_lat_da = grid_lat_da.transpose("lat", "lon")
+        grid_lon_da = grid_lon_da.transpose("lat", "lon")
+
+        grid_lat_da = grid_lat_da.chunk(template.chunksizes)
+        grid_lon_da = grid_lon_da.chunk(template.chunksizes)
+
+
+        return xr.map_blocks(
+            _interpolate_chunk,
+            grid_lat_da,
+            args=[grid_lon_da],
+            template=template,
+        )
 
     def interpolate_points(
         self, values: np.ndarray, point_lats: np.ndarray, point_lons: np.ndarray
