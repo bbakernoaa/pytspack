@@ -1,0 +1,5 @@
+numpy>=1.21.0
+pytest
+pytest-benchmark
+xarray
+dask
