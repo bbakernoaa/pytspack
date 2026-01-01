@@ -288,6 +288,12 @@ class SphericalMesh:
         that do not fit into memory. The source `values` must be an
         `xarray.DataArray` with a dimension named 'points'.
 
+        .. note::
+           Due to Dask's overhead, this method may be slower than
+           :meth:`interpolate_to_numpy_grid` for small grids that fit in
+           memory. Its primary advantage is scalability for out-of-core
+           datasets.
+
         Parameters
         ----------
         values : xr.DataArray
@@ -364,10 +370,15 @@ class SphericalMesh:
         interpolation. It constructs the full target grid in memory,
         performs the interpolation, and returns the result as a NumPy array.
 
+        .. note::
+           This method is generally faster for smaller grids that fit
+           comfortably in memory because it avoids the overhead associated
+           with Dask.
+
         .. warning::
            This function loads the entire grid into memory and is not
            recommended for large datasets. For scalable, parallelized
-           interpolation, use the `interpolate` method which leverages
+           interpolation, use the :meth:`interpolate` method which leverages
            `xarray` and `dask`.
 
         Parameters

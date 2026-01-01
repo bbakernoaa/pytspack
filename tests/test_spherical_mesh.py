@@ -187,9 +187,7 @@ def test_spherical_mesh_interpolate_xarray():
     computed_da = interpolated_da.compute()
 
     # Compare with the original numpy-based method
-    numpy_result = mesh.interpolate_to_numpy_grid(
-        source_values, grid_lats, grid_lons
-    )
+    numpy_result = mesh.interpolate_to_numpy_grid(source_values, grid_lats, grid_lons)
     expected_da = xr.DataArray(
         numpy_result, dims=["lat", "lon"], coords={"lat": grid_lats, "lon": grid_lons}
     )
@@ -199,7 +197,4 @@ def test_spherical_mesh_interpolate_xarray():
 
     # Verify that the history attribute is updated
     assert "history" in interpolated_da.attrs
-    assert (
-        interpolated_da.attrs["history"]
-        == "Interpolated via renka.SphericalMesh."
-    )
+    assert interpolated_da.attrs["history"] == "Interpolated via renka.SphericalMesh."
