@@ -72,6 +72,7 @@ if __name__ == "__main__":
     # The hvplot save function requires geoviews and selenium
     try:
         import holoviews as hv
+
         hv.extension("bokeh")
         hvplot.save(plot, "interpolated_map.html")
         print("\n--- Visualization saved to interpolated_map.html ---")
