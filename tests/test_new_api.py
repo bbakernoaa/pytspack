@@ -29,7 +29,7 @@ class TestNewApi(unittest.TestCase):
         grid_lats = np.array([5.0, 15.0])
         grid_lons = np.array([5.0, 15.0])
 
-        results = mesh.interpolate(values, grid_lats, grid_lons)
+        results = mesh.interpolate_to_numpy_grid(values, grid_lats, grid_lons)
 
         self.assertEqual(results.shape, (2, 2))
         self.assertTrue(np.all(np.isfinite(results)))

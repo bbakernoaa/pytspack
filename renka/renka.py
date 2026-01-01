@@ -3,6 +3,8 @@ import numpy as np
 import os
 import importlib.util
 from ctypes import c_int, c_double, POINTER, byref
+from typing import Union
+import xarray as xr
 
 
 # Helper to load the C extension
@@ -272,19 +274,101 @@ class SphericalMesh:
 
     def interpolate(
         self,
+        values: xr.DataArray,
+        grid_lats: Union[np.ndarray, xr.DataArray],
+        grid_lons: Union[np.ndarray, xr.DataArray],
+        lat_dim: str = "lat",
+        lon_dim: str = "lon",
+    ) -> xr.DataArray:
+        """
+        Interpolates data onto a rectilinear grid using Dask for parallelism.
+
+        This method leverages `xarray.apply_ufunc` to perform lazy,
+        chunked interpolation, making it suitable for very large datasets
+        that do not fit into memory. The source `values` must be an
+        `xarray.DataArray` with a dimension named 'points'.
+
+        Parameters
+        ----------
+        values : xr.DataArray
+            A 1D DataArray of values at the source mesh nodes. Must contain
+            a dimension named 'points' corresponding to the nodes in the mesh.
+        grid_lats : Union[np.ndarray, xr.DataArray]
+            A 1D array of latitude coordinates for the target grid.
+        grid_lons : Union[np.ndarray, xr.DataArray]
+            A 1D array of longitude coordinates for the target grid.
+        lat_dim : str, optional
+            The name of the latitude dimension in the output, by default "lat".
+        lon_dim : str, optional
+            The name of the longitude dimension in the output, by default "lon".
+
+        Returns
+        -------
+        xr.DataArray
+            A 2D DataArray containing the interpolated values on the specified
+            grid. The array is backed by Dask and computation is lazy. Call
+            `.compute()` to trigger the interpolation.
+
+        Raises
+        ------
+        ValueError
+            If the input `values` DataArray does not have a 'points' dimension.
+        """
+        if "points" not in values.dims:
+            raise ValueError("Input `values` DataArray must have a 'points' dimension.")
+
+        def _interp_on_grid(vals, lats, lons):
+            lon_grid, lat_grid = np.meshgrid(lons, lats)
+            flat_lats = lat_grid.flatten()
+            flat_lons = lon_grid.flatten()
+            interpolated_values = self.interpolate_points_vec(
+                vals, flat_lats, flat_lons
+            )
+            return interpolated_values.reshape(len(lats), len(lons))
+
+        # Ensure grid coordinates are xarray DataArrays for apply_ufunc
+        if not isinstance(grid_lats, xr.DataArray):
+            grid_lats = xr.DataArray(grid_lats, dims=lat_dim)
+        if not isinstance(grid_lons, xr.DataArray):
+            grid_lons = xr.DataArray(grid_lons, dims=lon_dim)
+
+        interpolated = xr.apply_ufunc(
+            _interp_on_grid,
+            values,
+            grid_lats,
+            grid_lons,
+            input_core_dims=[["points"], [lat_dim], [lon_dim]],
+            output_core_dims=[[lat_dim, lon_dim]],
+            exclude_dims=set(("points",)),
+            dask="parallelized",
+            output_dtypes=[values.dtype],
+        )
+        interpolated = interpolated.assign_coords(
+            {lat_dim: grid_lats, lon_dim: grid_lons}
+        )
+        interpolated.attrs = values.attrs
+        interpolated.attrs["history"] = (
+            values.attrs.get("history", "") + "Interpolated via renka.SphericalMesh."
+        )
+        return interpolated
+
+    def interpolate_to_numpy_grid(
+        self,
         values: np.ndarray,
         grid_lats: np.ndarray,
         grid_lons: np.ndarray,
     ) -> np.ndarray:
-        """Interpolates data onto a rectilinear grid.
+        """Interpolates data onto a rectilinear grid (eager execution).
 
-        This method is a convenience wrapper around `interpolate_points`. It
-        constructs a grid, flattens it, performs the point-wise
-        interpolation, and then reshapes the result back into a 2D grid.
+        This method provides a simple, NumPy-based interface for grid
+        interpolation. It constructs the full target grid in memory,
+        performs the interpolation, and returns the result as a NumPy array.
 
         .. warning::
-           This function can be slow for large grids due to the underlying
-           loop in `interpolate_points`.
+           This function loads the entire grid into memory and is not
+           recommended for large datasets. For scalable, parallelized
+           interpolation, use the `interpolate` method which leverages
+           `xarray` and `dask`.
 
         Parameters
         ----------
@@ -303,8 +387,7 @@ class SphericalMesh:
         -------
         np.ndarray
             A 2D NumPy array of shape `(len(grid_lats), len(grid_lons))`
-            containing the interpolated values. Points outside the convex
-            hull of the data will be `np.nan`.
+            containing the interpolated values.
         """
         # Create a meshgrid and flatten it for point-wise interpolation
         lon_grid, lat_grid = np.meshgrid(grid_lons, grid_lats)

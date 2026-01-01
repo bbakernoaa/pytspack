@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 import ctypes
+import xarray as xr
 from renka import SphericalMesh
 from renka.renka import _lib
 
@@ -152,3 +153,53 @@ def _original_interpolate_points(
         fp[i] = fp_i.value
 
     return fp
+
+
+def test_spherical_mesh_interpolate_xarray():
+    """
+    Test the xarray/dask-based grid interpolation.
+    """
+    # 1. The Logic (Setup)
+    source_lats = np.array([0, 0, 90, -90])
+    source_lons = np.array([0, 90, 0, 0])
+    source_values = np.array([10.0, 20.0, 30.0, 40.0])
+    mesh = SphericalMesh(lats=source_lats, lons=source_lons)
+
+    # Create xarray DataArray for source values
+    source_da = xr.DataArray(
+        source_values,
+        dims=["points"],
+        coords={"lat": ("points", source_lats), "lon": ("points", source_lons)},
+    ).chunk({"points": -1})
+
+    # Define target grid
+    grid_lats = np.linspace(-90, 90, 10)
+    grid_lons = np.linspace(0, 360, 20)
+
+    # 2. The Proof (Execution & Assertion)
+    # Use the new xarray-based method
+    interpolated_da = mesh.interpolate(source_da, grid_lats, grid_lons)
+
+    # Verify that the output is a Dask array (lazy)
+    assert hasattr(interpolated_da.data, "dask"), "Output is not a Dask array."
+
+    # Compute the result
+    computed_da = interpolated_da.compute()
+
+    # Compare with the original numpy-based method
+    numpy_result = mesh.interpolate_to_numpy_grid(
+        source_values, grid_lats, grid_lons
+    )
+    expected_da = xr.DataArray(
+        numpy_result, dims=["lat", "lon"], coords={"lat": grid_lats, "lon": grid_lons}
+    )
+
+    # Use xarray's testing utility to compare the results
+    xr.testing.assert_allclose(computed_da, expected_da)
+
+    # Verify that the history attribute is updated
+    assert "history" in interpolated_da.attrs
+    assert (
+        interpolated_da.attrs["history"]
+        == "Interpolated via renka.SphericalMesh."
+    )
