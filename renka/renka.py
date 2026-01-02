@@ -1,8 +1,11 @@
 import ctypes
-import numpy as np
 import os
 import importlib.util
 from ctypes import c_int, c_double, POINTER, byref
+from typing import Union
+
+import numpy as np
+import xarray as xr
 
 
 # Helper to load the C extension
@@ -272,6 +275,103 @@ class SphericalMesh:
 
     def interpolate(
         self,
+        values: xr.DataArray,
+        grid_lats: Union[np.ndarray, xr.DataArray],
+        grid_lons: Union[np.ndarray, xr.DataArray],
+        point_dim: str = "points",
+    ) -> xr.DataArray:
+        """
+        Interpolates unstructured (point) data to a rectilinear grid using
+        Dask-aware lazy evaluation via `xarray.apply_ufunc`.
+
+        This method is the primary, high-performance interface for
+        interpolation. It wraps the core C interpolation function but
+        delegates the iteration and parallelization to Dask, allowing it to
+        scale to datasets larger than memory.
+
+        Parameters
+        ----------
+        values : xr.DataArray
+            A 1D `xarray.DataArray` of data values corresponding to the
+            unstructured mesh points (`lats`, `lons`) used to initialize
+            the `SphericalMesh`. The array must have a dimension name that
+            matches `point_dim`.
+        grid_lats : Union[np.ndarray, xr.DataArray]
+            A 1D array of latitude coordinates for the output grid.
+        grid_lons : Union[np.ndarray, xr.DataArray]
+            A 1D array of longitude coordinates for the output grid.
+        point_dim : str, optional
+            The name of the dimension in the `values` DataArray that
+            represents the unstructured points, by default "points".
+
+        Returns
+        -------
+        xr.DataArray
+            A `xarray.DataArray` containing the interpolated grid. The result
+            is a Dask array if the input `values` array was Dask-backed.
+            The computation is lazy and will only be triggered when a
+            `.compute()` or `.load()` method is called on the result.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> import xarray as xr
+        >>> import dask.array as da
+        >>> from renka import SphericalMesh
+        # 1. Create a source mesh and data
+        >>> n_points = 1000
+        >>> src_lats = np.random.uniform(-90, 90, n_points)
+        >>> src_lons = np.random.uniform(-180, 180, n_points)
+        >>> src_values = np.sin(np.deg2rad(src_lats))
+        # Wrap in a Dask-backed xarray.DataArray
+        >>> src_da = xr.DataArray(
+        ...     da.from_array(src_values, chunks='auto'),
+        ...     dims=['points'],
+        ...     coords={'lat': ('points', src_lats), 'lon': ('points', src_lons)}
+        ... )
+        # 2. Define the target grid
+        >>> grid_lats = np.arange(-90, 91, 1.0)
+        >>> grid_lons = np.arange(-180, 181, 1.0)
+        # 3. Initialize the mesh and interpolate
+        >>> mesh = SphericalMesh(src_lats, src_lons)
+        >>> interpolated_da = mesh.interpolate(src_da, grid_lats, grid_lons)
+        # 4. The result is a lazy Dask array. Trigger computation:
+        >>> result = interpolated_da.compute()
+        >>> print(result.shape)
+        (181, 361)
+        """
+        # Ensure the dimension exists
+        if point_dim not in values.dims:
+            raise ValueError(f"Input `values` DataArray must have dimension '{point_dim}'")
+
+        def grid_interp_wrapper(data, glats, glons):
+            lon_grid, lat_grid = np.meshgrid(glons, glats)
+            return self.interpolate_points_vec(
+                data, lat_grid.flatten(), lon_grid.flatten()
+            ).reshape(len(glats), len(glons))
+
+        # The `vectorize=True` flag tells apply_ufunc to loop over the
+        # non-core dimensions of the input. Here, these are the dimensions
+        # of `values` other than `point_dim`.
+        interpolated_grid = xr.apply_ufunc(
+            grid_interp_wrapper,
+            values,
+            grid_lats,
+            grid_lons,
+            input_core_dims=[[point_dim], ["lat"], ["lon"]],
+            output_core_dims=[["lat", "lon"]],
+            dask="parallelized",
+            output_dtypes=[values.dtype],
+        )
+
+        # The coordinates are not automatically attached by apply_ufunc
+        # for the new output dimensions, so we add them back.
+        return interpolated_grid.assign_coords(
+            {"lat": grid_lats, "lon": grid_lons}
+        )
+
+    def interpolate_to_numpy_grid(
+        self,
         values: np.ndarray,
         grid_lats: np.ndarray,
         grid_lons: np.ndarray,
@@ -283,8 +383,9 @@ class SphericalMesh:
         interpolation, and then reshapes the result back into a 2D grid.
 
         .. warning::
-           This function can be slow for large grids due to the underlying
-           loop in `interpolate_points`.
+           This function can be slow for large grids and always returns
+           an in-memory NumPy array. For large-scale, out-of-core
+           computation, use the Dask-aware `interpolate` method instead.
 
         Parameters
         ----------
