@@ -24,4 +24,6 @@ docs = [
 test = [
     "pytest",
     "pytest-benchmark",
+    "xarray",
+    "dask",
 ]
