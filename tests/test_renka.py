@@ -143,3 +143,50 @@ def test_sphericalmesh_regrid_conservative():
     assert not np.isnan(interior_view).any(), (
         "Regridded data contains NaNs in its interior."
     )
+
+
+def test_sphericalmesh_interpolate_provenance():
+    """
+    Tests that the SphericalMesh.interpolate method adds provenance.
+
+    This test verifies that the `interpolate` method correctly adds a
+    `history` attribute to the output `xarray.DataArray`, which is a
+    critical part of the Aero Protocol for ensuring data lineage and
+    reproducibility. It checks for both the creation of a new history
+    attribute and the appending to an existing one.
+    """
+    # Define sample scattered data points
+    lats = np.array([30.0, 45.0, 35.0, 40.0])
+    lons = np.array([-90.0, -85.0, -95.0, -90.0])
+    values = np.array([10.0, 20.0, 15.0, 18.0])
+
+    # 1. Test with no pre-existing history attribute
+    values_da_no_history = xr.DataArray(
+        da.from_array(values, chunks="auto"),
+        dims=["points"],
+        coords={"lat": ("points", lats), "lon": ("points", lons)},
+    )
+
+    mesh = SphericalMesh(lats, lons)
+    grid_lats = np.linspace(30, 45, 5)
+    grid_lons = np.linspace(-95, -85, 5)
+
+    interpolated_da = mesh.interpolate(values_da_no_history, grid_lats, grid_lons)
+
+    assert "history" in interpolated_da.attrs
+    assert "Interpolated from unstructured grid" in interpolated_da.attrs["history"]
+    assert "5x5 grid" in interpolated_da.attrs["history"]
+
+    # 2. Test appending to an existing history attribute
+    initial_history = "Step 1: Raw data loaded."
+    values_da_with_history = values_da_no_history.copy(deep=True)
+    values_da_with_history.attrs["history"] = initial_history
+
+    interpolated_da_append = mesh.interpolate(
+        values_da_with_history, grid_lats, grid_lons
+    )
+
+    assert "history" in interpolated_da_append.attrs
+    # Check that the new history is appended with a newline
+    assert initial_history in interpolated_da_append.attrs["history"]
+    assert "\nInterpolated from" in interpolated_da_append.attrs["history"]
