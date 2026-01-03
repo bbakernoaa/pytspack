@@ -12,7 +12,8 @@ license = {text = "MIT"}
 dependencies = [
     "numpy>=1.21.0",
     "xarray",
-    "dask"
+    "dask",
+    "setuptools",
 ]
 
 [project.optional-dependencies]
@@ -24,4 +25,5 @@ docs = [
 test = [
     "pytest",
     "pytest-benchmark",
+    "ruff",
 ]
