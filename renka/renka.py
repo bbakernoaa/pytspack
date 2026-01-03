@@ -342,7 +342,9 @@ class SphericalMesh:
         """
         # Ensure the dimension exists
         if point_dim not in values.dims:
-            raise ValueError(f"Input `values` DataArray must have dimension '{point_dim}'")
+            raise ValueError(
+                f"Input `values` DataArray must have dimension '{point_dim}'"
+            )
 
         def grid_interp_wrapper(data, glats, glons):
             lon_grid, lat_grid = np.meshgrid(glons, glats)
@@ -366,9 +368,7 @@ class SphericalMesh:
 
         # The coordinates are not automatically attached by apply_ufunc
         # for the new output dimensions, so we add them back.
-        return interpolated_grid.assign_coords(
-            {"lat": grid_lats, "lon": grid_lons}
-        )
+        return interpolated_grid.assign_coords({"lat": grid_lats, "lon": grid_lons})
 
     def interpolate_to_numpy_grid(
         self,

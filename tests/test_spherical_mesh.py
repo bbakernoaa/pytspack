@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 import ctypes
 from renka import SphericalMesh
 from renka.renka import _lib

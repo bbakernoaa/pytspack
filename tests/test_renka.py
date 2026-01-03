@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 import xarray as xr
 import dask.array as da
 from renka.renka import SphericalMesh
@@ -63,10 +62,10 @@ def test_sphericalmesh_interpolate_dask():
 
     # Wrap the source values in a Dask-backed xarray.DataArray
     values_da = xr.DataArray(
-        da.from_array(values, chunks='auto'),
-        dims=['points'],
-        coords={'lat': ('points', lats), 'lon': ('points', lons)}
-    ).chunk({'points': -1})
+        da.from_array(values, chunks="auto"),
+        dims=["points"],
+        coords={"lat": ("points", lats), "lon": ("points", lons)},
+    ).chunk({"points": -1})
 
     # Initialize the spherical mesh
     mesh = SphericalMesh(lats, lons)
@@ -79,7 +78,9 @@ def test_sphericalmesh_interpolate_dask():
     interpolated_da = mesh.interpolate(values_da, grid_lats, grid_lons)
 
     # 1. Check that the output is a Dask-backed xarray.DataArray
-    assert isinstance(interpolated_da, xr.DataArray), "Output is not an xarray.DataArray."
+    assert isinstance(interpolated_da, xr.DataArray), (
+        "Output is not an xarray.DataArray."
+    )
     assert isinstance(interpolated_da.data, da.Array), "Output is not a Dask array."
 
     # 2. Trigger computation and get the result
@@ -91,13 +92,13 @@ def test_sphericalmesh_interpolate_dask():
         computed_data.values,
         numpy_data,
         atol=1e-9,
-        err_msg="Dask-aware interpolation result does not match NumPy result."
+        err_msg="Dask-aware interpolation result does not match NumPy result.",
     )
 
     # 4. Check shape and coordinates
     assert computed_data.shape == (16, 11), "Computed array shape is incorrect."
-    assert 'lat' in computed_data.coords
-    assert 'lon' in computed_data.coords
+    assert "lat" in computed_data.coords
+    assert "lon" in computed_data.coords
 
 
 def test_sphericalmesh_regrid_conservative():
