@@ -407,21 +407,6 @@ class SphericalMesh:
         >>> result = interpolated_da.compute()
         >>> print(result.shape)
         (181, 361)
-
-        # 5. Visualize the result (Track A: Publication)
-        >>> import matplotlib.pyplot as plt
-        >>> import cartopy.crs as ccrs
-        >>> fig = plt.figure(figsize=(10, 5))
-        >>> ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
-        >>> result.plot(
-        ...     ax=ax,
-        ...     transform=ccrs.PlateCarree(),
-        ...     cmap='viridis',
-        ...     cbar_kwargs={'shrink': 0.6, 'label': 'Interpolated Value'}
-        ... )
-        >>> ax.coastlines()
-        >>> ax.gridlines(draw_labels=True)
-        >>> plt.show()
         """
         # Ensure the dimension exists
         if point_dim not in values.dims:
@@ -451,16 +436,7 @@ class SphericalMesh:
 
         # The coordinates are not automatically attached by apply_ufunc
         # for the new output dimensions, so we add them back.
-        result = interpolated_grid.assign_coords({"lat": grid_lats, "lon": grid_lons})
-
-        # --- Add Provenance ---
-        history = f"Interpolated from unstructured grid to a {len(grid_lats)}x{len(grid_lons)} grid. ({datetime.utcnow().isoformat()})"
-        new_history = history
-        if "history" in values.attrs:
-            new_history = values.attrs["history"] + "\n" + history
-        result.attrs["history"] = new_history
-
-        return result
+        return interpolated_grid.assign_coords({"lat": grid_lats, "lon": grid_lons})
 
     def _get_best_mesh(self, lat, lon):
         if not hasattr(self, "meshes_"):
