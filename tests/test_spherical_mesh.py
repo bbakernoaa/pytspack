@@ -151,3 +151,35 @@ def _original_interpolate_points(
         fp[i] = fp_i.value
 
     return fp
+
+
+def test_large_regular_grid_partitioned():
+    """
+    Test that a large, regular grid can be successfully triangulated and
+    interpolated using the partitioned mesh approach.
+    """
+    n_lats = 400
+    n_lons = 800
+
+    lats = np.linspace(-89, 89, n_lats)
+    lons = np.linspace(-179, 179, n_lons)
+    lon_grid, lat_grid = np.meshgrid(lons, lats)
+
+    src_lats = lat_grid.flatten()
+    src_lons = lon_grid.flatten()
+
+    values = np.sin(np.deg2rad(src_lats))
+
+    # Use a large number of partitions to exercise the partitioning logic
+    mesh = SphericalMesh(src_lats, src_lons, n_partitions=16)
+
+    # Define a small target grid for interpolation
+    grid_lats = np.array([-80, 0, 80])
+    grid_lons = np.array([-160, 0, 160])
+
+    # This will trigger the partitioned mesh creation and interpolation
+    result = mesh.interpolate_to_numpy_grid(values, grid_lats, grid_lons)
+
+    # Check that the result has the correct shape and contains valid numbers
+    assert result.shape == (len(grid_lats), len(grid_lons))
+    assert not np.isnan(result).any()

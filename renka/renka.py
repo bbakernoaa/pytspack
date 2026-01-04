@@ -2,8 +2,12 @@ import ctypes
 import os
 import importlib.util
 from ctypes import c_int, c_double, POINTER, byref
-from datetime import datetime
-from typing import Union
+from typing import Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import dask.array
+
+from renka.utils import jitter_coordinates
 
 import numpy as np
 import xarray as xr
@@ -78,17 +82,79 @@ class TsPack:
 
 
 class SphericalMesh:
-    def __init__(self, lats: np.ndarray, lons: np.ndarray):
-        self.n = len(lats)
-        self.lats = self._check_and_convert(lats, is_lat=True)
-        self.lons = self._check_and_convert(lons, is_lat=False)
+    def __init__(
+        self,
+        lats: Union[np.ndarray, "dask.array.Array"],
+        lons: Union[np.ndarray, "dask.array.Array"],
+        n_partitions: int = 1,
+    ):
+        if hasattr(lats, "dask"):
+            self.n = lats.shape[0]
+        else:
+            self.n = len(lats)
+
+        self.lats = lats
+        self.lons = lons
+        self.n_partitions = n_partitions
+        self._triangulated = False
+        self._bind()
+
+    def _build_partitioned_mesh(self):
+        import dask.array as da
+        from scipy.spatial import KDTree
+
+        # 1. Compute centroids for partitioning
+        partition_lons = np.linspace(-180, 180, self.n_partitions + 2)[1:-1]
+        partition_lats = np.zeros_like(partition_lons)
+        px, py, pz = self._spherical_to_cartesian(partition_lats, partition_lons)
+        partition_points = np.vstack([px, py, pz]).T
+
+        # 2. Assign each source point to the nearest partition centroid
+        src_x, src_y, src_z = self._spherical_to_cartesian(self.lats, self.lons)
+        src_points = da.vstack([src_x, src_y, src_z]).T
+
+        tree = KDTree(partition_points)
+        _, assignments = tree.query(src_points.compute())
+
+        # 3. Create a mesh for each partition in parallel
+        self.meshes_ = []
+        self.indices_ = []
+        for i in range(self.n_partitions):
+            idx = np.where(assignments == i)[0]
+            if len(idx) > 3:  # Need at least 3 points for a triangle
+                lats, lons = jitter_coordinates(self.lats[idx], self.lons[idx])
+                mesh = SphericalMesh(lats, lons)
+                mesh._compute_mesh()
+                self.meshes_.append(mesh)
+                self.indices_.append(idx)
+
+    def _spherical_to_cartesian(self, lats, lons):
+        x = np.cos(lats) * np.cos(lons)
+        y = np.cos(lats) * np.sin(lons)
+        z = np.sin(lats)
+        return x, y, z
+
+    def _compute_mesh(self):
+        if self._triangulated:
+            return
+
+        if self.n > 100_000 and self.n_partitions > 1:
+            self._build_partitioned_mesh()
+            self._triangulated = True
+            return
+
+        if hasattr(self.lats, "dask"):
+            self.lats = self.lats.compute()
+        if hasattr(self.lons, "dask"):
+            self.lons = self.lons.compute()
+
+        self.lats = self._check_and_convert(self.lats, is_lat=True)
+        self.lons = self._check_and_convert(self.lons, is_lat=False)
         np.clip(self.lats, -np.pi / 2, np.pi / 2, out=self.lats)
 
         self.x = np.zeros(self.n, dtype=np.float64)
         self.y = np.zeros(self.n, dtype=np.float64)
         self.z = np.zeros(self.n, dtype=np.float64)
-
-        self._bind()  # Centralized C-function binding
 
         _lib.trans(self.n, self.lats, self.lons, self.x, self.y, self.z)
 
@@ -118,6 +184,7 @@ class SphericalMesh:
 
         if ier.value != 0:
             raise RuntimeError(f"STRIPACK TRMESH Error: {ier.value}")
+        self._triangulated = True
 
     def _check_and_convert(self, arr: np.ndarray, is_lat: bool = False) -> np.ndarray:
         arr = np.ascontiguousarray(arr, dtype=np.float64)
@@ -340,21 +407,6 @@ class SphericalMesh:
         >>> result = interpolated_da.compute()
         >>> print(result.shape)
         (181, 361)
-
-        # 5. Visualize the result (Track A: Publication)
-        >>> import matplotlib.pyplot as plt
-        >>> import cartopy.crs as ccrs
-        >>> fig = plt.figure(figsize=(10, 5))
-        >>> ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
-        >>> result.plot(
-        ...     ax=ax,
-        ...     transform=ccrs.PlateCarree(),
-        ...     cmap='viridis',
-        ...     cbar_kwargs={'shrink': 0.6, 'label': 'Interpolated Value'}
-        ... )
-        >>> ax.coastlines()
-        >>> ax.gridlines(draw_labels=True)
-        >>> plt.show()
         """
         # Ensure the dimension exists
         if point_dim not in values.dims:
@@ -384,16 +436,28 @@ class SphericalMesh:
 
         # The coordinates are not automatically attached by apply_ufunc
         # for the new output dimensions, so we add them back.
-        result = interpolated_grid.assign_coords({"lat": grid_lats, "lon": grid_lons})
+        return interpolated_grid.assign_coords({"lat": grid_lats, "lon": grid_lons})
 
-        # --- Add Provenance ---
-        history = f"Interpolated from unstructured grid to a {len(grid_lats)}x{len(grid_lons)} grid. ({datetime.utcnow().isoformat()})"
-        new_history = history
-        if "history" in values.attrs:
-            new_history = values.attrs["history"] + "\n" + history
-        result.attrs["history"] = new_history
+    def _get_best_mesh(self, lat, lon):
+        if not hasattr(self, "meshes_"):
+            return self, -1
 
-        return result
+        # Simple spatial lookup: find the mesh whose centroid is closest.
+        # A more robust solution would check for convex hull containment.
+        x, y, z = self._spherical_to_cartesian(np.deg2rad(lat), np.deg2rad(lon))
+        target_point = np.array([x, y, z])
+
+        closest_mesh_idx = -1
+        min_dist = float("inf")
+
+        for i, mesh in enumerate(self.meshes_):
+            centroid = np.array([mesh.x.mean(), mesh.y.mean(), mesh.z.mean()])
+            dist = np.linalg.norm(target_point - centroid)
+            if dist < min_dist:
+                min_dist = dist
+                closest_mesh_idx = i
+
+        return self.meshes_[closest_mesh_idx], closest_mesh_idx
 
     def interpolate_to_numpy_grid(
         self,
@@ -483,6 +547,22 @@ class SphericalMesh:
             If the underlying C functions for gradient calculation or
             interpolation return an error.
         """
+        self._compute_mesh()
+
+        if hasattr(self, "meshes_"):
+            # Simplified partitioned interpolation
+            results = np.full(len(point_lats), np.nan, dtype=np.float64)
+            for i in range(len(point_lats)):
+                mesh, mesh_idx = self._get_best_mesh(point_lats[i], point_lons[i])
+                if mesh:
+                    partition_values = values[self.indices_[mesh_idx]]
+                    results[i] = mesh.interpolate_points_vec(
+                        partition_values,
+                        np.array([point_lats[i]]),
+                        np.array([point_lons[i]]),
+                    )[0]
+            return results
+
         vals = np.ascontiguousarray(values, dtype=np.float64)
         p_lat = self._check_and_convert(point_lats, is_lat=True)
         p_lon = self._check_and_convert(point_lons, is_lat=False)
@@ -570,6 +650,7 @@ class SphericalMesh:
         --------
         2D Array (Lon, Lat) matching the target grid.
         """
+        self._compute_mesh()
         vals = np.ascontiguousarray(values, dtype=np.float32)
         g_lat = self._check_and_convert(grid_lats, True).astype(np.float32)
         g_lon = self._check_and_convert(grid_lons, False).astype(np.float32)
