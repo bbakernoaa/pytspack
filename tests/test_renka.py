@@ -101,6 +101,10 @@ def test_sphericalmesh_interpolate_dask():
     assert "lat" in computed_data.coords
     assert "lon" in computed_data.coords
 
+    # 5. Check for 'history' attribute (Provenance)
+    assert "history" in interpolated_da.attrs
+    assert "Interpolated from unstructured mesh" in interpolated_da.attrs["history"]
+
 
 def test_sphericalmesh_regrid_conservative():
     """
