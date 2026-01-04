@@ -1,6 +1,7 @@
 import ctypes
 import os
 import importlib.util
+import datetime
 from ctypes import c_int, c_double, POINTER, byref
 from typing import Union, TYPE_CHECKING
 
@@ -382,11 +383,13 @@ class SphericalMesh:
 
         Examples
         --------
+        **1. Basic Interpolation**
+
         >>> import numpy as np
         >>> import xarray as xr
         >>> import dask.array as da
         >>> from renka import SphericalMesh
-        # 1. Create a source mesh and data
+        # Create a source mesh and data
         >>> n_points = 1000
         >>> src_lats = np.random.uniform(-90, 90, n_points)
         >>> src_lons = np.random.uniform(-180, 180, n_points)
@@ -397,16 +400,39 @@ class SphericalMesh:
         ...     dims=['points'],
         ...     coords={'lat': ('points', src_lats), 'lon': ('points', src_lons)}
         ... )
-        # 2. Define the target grid
+        # Define the target grid
         >>> grid_lats = np.arange(-90, 91, 1.0)
         >>> grid_lons = np.arange(-180, 181, 1.0)
-        # 3. Initialize the mesh and interpolate
+        # Initialize the mesh and interpolate
         >>> mesh = SphericalMesh(src_lats, src_lons)
         >>> interpolated_da = mesh.interpolate(src_da, grid_lats, grid_lons)
-        # 4. The result is a lazy Dask array. Trigger computation:
+        # The result is a lazy Dask array. Trigger computation:
         >>> result = interpolated_da.compute()
         >>> print(result.shape)
         (181, 361)
+
+        **2. Visualization with Matplotlib and Cartopy**
+
+        This example demonstrates how to plot the interpolated grid, which is a
+        critical step for scientific validation and publication.
+
+        >>> import matplotlib.pyplot as plt
+        >>> import cartopy.crs as ccrs
+        # Assuming `result` is the computed DataArray from the first example
+        >>> fig = plt.figure(figsize=(10, 5))
+        >>> ax = fig.add_subplot(1, 1, 1, projection=ccrs.Robinson())
+        >>> ax.set_global()
+        >>> ax.coastlines()
+        # The data is on a regular lat/lon grid, so PlateCarree is the correct transform
+        >>> transform = ccrs.PlateCarree()
+        >>> result.plot.pcolormesh(
+        ...     ax=ax,
+        ...     transform=transform,
+        ...     x='lon',
+        ...     y='lat',
+        ...     cmap='viridis'
+        ... ) # doctest: +SKIP
+        >>> # plt.show() # doctest: +SKIP
         """
         # Ensure the dimension exists
         if point_dim not in values.dims:
@@ -436,7 +462,21 @@ class SphericalMesh:
 
         # The coordinates are not automatically attached by apply_ufunc
         # for the new output dimensions, so we add them back.
-        return interpolated_grid.assign_coords({"lat": grid_lats, "lon": grid_lons})
+        result = interpolated_grid.assign_coords({"lat": grid_lats, "lon": grid_lons})
+
+        # --- Provenance ---
+        # Append to the history attribute of the new DataArray
+        timestamp = datetime.datetime.utcnow().isoformat()
+        history_log = (
+            f"{timestamp}: Interpolated from unstructured mesh "
+            f"(n={self.n}) to a regular grid "
+            f"({len(grid_lats)}x{len(grid_lons)}) using renka.SphericalMesh."
+        )
+        if "history" in values.attrs:
+            history_log = f"{values.attrs['history']}\n{history_log}"
+        result.attrs["history"] = history_log
+
+        return result
 
     def _get_best_mesh(self, lat, lon):
         if not hasattr(self, "meshes_"):
