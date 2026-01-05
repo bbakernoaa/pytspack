@@ -793,8 +793,7 @@ class SphericalMesh:
                 )
                 if ier.value != 0:
                     raise ValueError(
-                        "Conservative regridding failed with error code "
-                        f"{ier.value}"
+                        f"Conservative regridding failed with error code {ier.value}"
                     )
             except AttributeError:
                 raise RuntimeError(
@@ -830,7 +829,7 @@ class SphericalMesh:
             f"{timestamp}: Conservatively regridded from unstructured mesh "
             f"(n={self.n}) to a regular grid "
             f"({len(grid_lats)}x{len(grid_lons)}) using renka.SphericalMesh "
-            f"with {samples*samples} samples per cell."
+            f"with {samples * samples} samples per cell."
         )
         if "history" in values.attrs:
             history_log = f"{values.attrs['history']}\n{history_log}"
