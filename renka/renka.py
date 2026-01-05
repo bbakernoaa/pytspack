@@ -466,7 +466,7 @@ class SphericalMesh:
 
         # --- Provenance ---
         # Append to the history attribute of the new DataArray
-        timestamp = datetime.datetime.now(datetime.UTC).isoformat()
+        timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
         history_log = (
             f"{timestamp}: Interpolated from unstructured mesh "
             f"(n={self.n}) to a regular grid "
@@ -824,7 +824,7 @@ class SphericalMesh:
         result = regridded_grid.assign_coords({"lat": grid_lats, "lon": grid_lons})
 
         # --- Provenance ---
-        timestamp = datetime.datetime.now(datetime.UTC).isoformat()
+        timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
         history_log = (
             f"{timestamp}: Conservatively regridded from unstructured mesh "
             f"(n={self.n}) to a regular grid "
