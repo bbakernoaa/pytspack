@@ -466,7 +466,7 @@ class SphericalMesh:
 
         # --- Provenance ---
         # Append to the history attribute of the new DataArray
-        timestamp = datetime.datetime.utcnow().isoformat()
+        timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
         history_log = (
             f"{timestamp}: Interpolated from unstructured mesh "
             f"(n={self.n}) to a regular grid "
@@ -666,73 +666,173 @@ class SphericalMesh:
             )
         return fp
 
-    def regrid_conservative(self, values, grid_lats, grid_lons, samples=5):
+    def regrid_conservative(
+        self,
+        values: xr.DataArray,
+        grid_lats: Union[np.ndarray, xr.DataArray],
+        grid_lons: Union[np.ndarray, xr.DataArray],
+        samples: int = 5,
+        point_dim: str = "points",
+    ) -> xr.DataArray:
         """
-        Perform First-Order Conservative Regridding (Area-weighted average).
+        Performs first-order conservative regridding using a sub-sampling
+        (Monte Carlo) method.
 
-        This method treats the source data as constant within its Voronoi cell.
-        It computes the value of target grid cells by sub-sampling 'samples' times
-        in each direction (samples^2 points per cell) and averaging the Voronoi IDs found.
+        This method is Dask-aware and performs all computations lazily. It
+        treats the source data as constant within each Voronoi cell. The value
+        for each target grid cell is computed by averaging the values of
+        `samples * samples` sample points placed uniformly within that cell.
 
-        To ensure global conservation, the final grid is renormalized by a constant
-        factor to ensure that the sum of its values equals the sum of the
-        original source values.
+        To ensure global conservation, the final grid is renormalized by a
+        constant factor to ensure that the sum of its values equals the sum
+        of the original source values.
 
-        Parameters:
-        -----------
-        values: Data values at source nodes
-        grid_lats: 1D array of target latitudes (edges or centers)
-        grid_lons: 1D array of target longitudes
-        samples: Sub-sampling rate (default 5 -> 25 points per cell).
-                 Higher = more accurate conservation, slower.
+        Parameters
+        ----------
+        values : xr.DataArray
+            A 1D `xarray.DataArray` of data values on the unstructured mesh.
+            Must have a dimension name that matches `point_dim`.
+        grid_lats : Union[np.ndarray, xr.DataArray]
+            A 1D array of latitude coordinates for the output grid.
+        grid_lons : Union[np.ndarray, xr.DataArray]
+            A 1D array of longitude coordinates for the output grid.
+        samples : int, optional
+            The sub-sampling rate per grid cell direction. The total number
+            of sample points per cell is `samples*samples`. A higher number
+            improves accuracy but increases computation time. Default is 5.
+        point_dim : str, optional
+            The name of the dimension in `values` that represents the
+            unstructured points. Default is "points".
 
-        Returns:
+        Returns
+        -------
+        xr.DataArray
+            A `xarray.DataArray` containing the regridded data on the new grid.
+            The result is a Dask array if the input `values` array was
+            Dask-backed.
+
+        Examples
         --------
-        2D Array (Lon, Lat) matching the target grid.
+        >>> import numpy as np
+        >>> import xarray as xr
+        >>> import dask.array as da
+        >>> from renka import SphericalMesh
+
+        # 1. Create source mesh and data
+        >>> n_points = 2000
+        >>> src_lats = np.random.uniform(-90, 90, n_points)
+        >>> src_lons = np.random.uniform(-180, 180, n_points)
+        >>> src_values = np.cos(np.deg2rad(src_lats))**2
+        >>> src_da = xr.DataArray(
+        ...     da.from_array(src_values, chunks='auto'),
+        ...     dims=['points'],
+        ...     coords={'lat': ('points', src_lats), 'lon': ('points', src_lons)}
+        ... )
+
+        # 2. Define target grid and perform regridding
+        >>> grid_lats = np.arange(-85, 86, 10.0)
+        >>> grid_lons = np.arange(-175, 176, 10.0)
+        >>> mesh = SphericalMesh(src_lats, src_lons)
+        >>> regridded_da = mesh.regrid_conservative(src_da, grid_lats, grid_lons)
+
+        # 3. The result is lazy. Compute and check shape.
+        >>> result = regridded_da.compute()
+        >>> print(result.shape)
+        (18, 36)
+
+        # 4. Visualization with Cartopy
+        >>> import matplotlib.pyplot as plt
+        >>> import cartopy.crs as ccrs
+        >>> fig = plt.figure(figsize=(10, 5))
+        >>> ax = fig.add_subplot(1, 1, 1, projection=ccrs.Mollweide())
+        >>> ax.set_global()
+        >>> ax.coastlines()
+        >>> result.plot.pcolormesh(
+        ...     ax=ax,
+        ...     transform=ccrs.PlateCarree(),
+        ...     x='lon',
+        ...     y='lat',
+        ...     cmap='viridis'
+        ... ) # doctest: +SKIP
+        >>> # plt.show() # doctest: +SKIP
         """
-        self._compute_mesh()
-        vals = np.ascontiguousarray(values, dtype=np.float32)
-        g_lat = self._check_and_convert(grid_lats, True).astype(np.float32)
-        g_lon = self._check_and_convert(grid_lons, False).astype(np.float32)
-
-        ni = len(g_lat)
-        nj = len(g_lon)
-        out_grid = np.zeros(ni * nj, dtype=np.float32)
-        ier = c_int()
-
-        try:
-            _lib.ssrf_conservative_regrid(
-                self.n,
-                self.x_f32,
-                self.y_f32,
-                self.z_f32,
-                vals,
-                self.list,
-                self.lptr,
-                self.lend,
-                ni,
-                nj,
-                g_lat,
-                g_lon,
-                samples,
-                out_grid,
-                byref(ier),
+        if point_dim not in values.dims:
+            raise ValueError(
+                f"Input `values` DataArray must have dimension '{point_dim}'"
             )
-            if ier.value != 0:
-                raise ValueError(
-                    f"Conservative regridding failed with error code {ier.value}"
+
+        def _regrid_wrapper(data, glats, glons):
+            """Core wrapper for the C conservative regridding function."""
+            self._compute_mesh()
+            vals = np.ascontiguousarray(data, dtype=np.float32)
+            g_lat = self._check_and_convert(glats, True).astype(np.float32)
+            g_lon = self._check_and_convert(glons, False).astype(np.float32)
+
+            ni = len(g_lat)
+            nj = len(g_lon)
+            out_grid = np.zeros(ni * nj, dtype=np.float32)
+            ier = c_int()
+
+            try:
+                _lib.ssrf_conservative_regrid(
+                    self.n,
+                    self.x_f32,
+                    self.y_f32,
+                    self.z_f32,
+                    vals,
+                    self.list,
+                    self.lptr,
+                    self.lend,
+                    ni,
+                    nj,
+                    g_lat,
+                    g_lon,
+                    samples,
+                    out_grid,
+                    byref(ier),
                 )
-        except AttributeError:
-            raise RuntimeError(
-                "C library does not support conservative regridding yet."
-            )
+                if ier.value != 0:
+                    raise ValueError(
+                        f"Conservative regridding failed with error code {ier.value}"
+                    )
+            except AttributeError:
+                raise RuntimeError(
+                    "C library does not support conservative regridding yet."
+                )
 
-        regridded_data = out_grid.reshape((nj, ni)).T
+            regridded_data = out_grid.reshape((nj, ni)).T
 
-        # Renormalize to enforce conservation of the sum, as expected by the test
-        regridded_sum = np.sum(regridded_data)
-        values_sum = np.sum(values)
-        if regridded_sum > 1e-9:  # Avoid division by zero
-            regridded_data *= values_sum / regridded_sum
+            # Renormalize to enforce conservation of the sum
+            regridded_sum = np.sum(regridded_data)
+            values_sum = np.sum(data)
+            if regridded_sum > 1e-9:  # Avoid division by zero
+                regridded_data *= values_sum / regridded_sum
 
-        return regridded_data
+            return regridded_data
+
+        regridded_grid = xr.apply_ufunc(
+            _regrid_wrapper,
+            values,
+            grid_lats,
+            grid_lons,
+            input_core_dims=[[point_dim], ["lat"], ["lon"]],
+            output_core_dims=[["lat", "lon"]],
+            dask="parallelized",
+            output_dtypes=[values.dtype],
+        )
+
+        result = regridded_grid.assign_coords({"lat": grid_lats, "lon": grid_lons})
+
+        # --- Provenance ---
+        timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        history_log = (
+            f"{timestamp}: Conservatively regridded from unstructured mesh "
+            f"(n={self.n}) to a regular grid "
+            f"({len(grid_lats)}x{len(grid_lons)}) using renka.SphericalMesh "
+            f"with {samples * samples} samples per cell."
+        )
+        if "history" in values.attrs:
+            history_log = f"{values.attrs['history']}\n{history_log}"
+        result.attrs["history"] = history_log
+
+        return result

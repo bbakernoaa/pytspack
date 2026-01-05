@@ -108,17 +108,26 @@ def test_sphericalmesh_interpolate_dask():
 
 def test_sphericalmesh_regrid_conservative():
     """
-    Tests the SphericalMesh.regrid_conservative method.
+    Tests the Dask-aware SphericalMesh.regrid_conservative method.
 
-    This test verifies that the conservative regridding function produces a
-    grid of the correct shape and that the total sum of the regridded data
-    is close to the sum of the original data, which is a key property of
-    conservative regridding.
+    This test verifies that the conservative regridding function:
+    1.  Accepts a Dask-backed xarray.DataArray as input.
+    2.  Produces a lazy Dask array as output.
+    3.  Creates a grid of the correct shape after computation.
+    4.  Approximately conserves the total sum of the source data.
+    5.  Includes a 'history' attribute for provenance tracking.
     """
     # Define sample scattered data points (latitude, longitude, value)
     lats = np.array([30.0, 45.0, 35.0, 40.0])
     lons = np.array([-90.0, -85.0, -95.0, -90.0])
     values = np.array([10.0, 20.0, 15.0, 18.0])
+
+    # Wrap the source values in a Dask-backed xarray.DataArray
+    values_da = xr.DataArray(
+        da.from_array(values, chunks="auto"),
+        dims=["points"],
+        coords={"lat": ("points", lats), "lon": ("points", lons)},
+    )
 
     # Initialize the spherical mesh
     mesh = SphericalMesh(lats, lons)
@@ -127,24 +136,30 @@ def test_sphericalmesh_regrid_conservative():
     grid_lats = np.linspace(30, 45, 16)
     grid_lons = np.linspace(-95, -85, 11)
 
-    # Perform conservative regridding
-    regridded_data = mesh.regrid_conservative(values, grid_lats, grid_lons)
+    # Perform Dask-aware conservative regridding
+    regridded_da = mesh.regrid_conservative(values_da, grid_lats, grid_lons)
 
-    # 1. Check the output shape
+    # 1. Check that the output is a Dask-backed xarray.DataArray
+    assert isinstance(regridded_da, xr.DataArray)
+    assert isinstance(regridded_da.data, da.Array)
+
+    # 2. Trigger computation
+    regridded_data = regridded_da.compute()
+
+    # 3. Check the output shape
     assert regridded_data.shape == (16, 11), "Output array shape is incorrect."
 
-    # 2. Check for conservation
-    # The sum of the regridded data should be close to the sum of the
-    # original data. This is a fundamental property of conservative
-    # regridding.
-    # Note: This is an approximate conservation, so we use a tolerance.
+    # 4. Check for conservation
     assert np.isclose(np.sum(regridded_data), np.sum(values), rtol=1e-6), (
         "Conservative regridding is not preserving the total sum."
     )
 
-    # 3. Check for NaN values in the interior
-    # The result may have NaNs on the boundary, but the interior should be finite.
-    interior_view = regridded_data[1:-1, 1:-1]
+    # 5. Check for NaN values in the interior
+    interior_view = regridded_data.values[1:-1, 1:-1]
     assert not np.isnan(interior_view).any(), (
         "Regridded data contains NaNs in its interior."
     )
+
+    # 6. Check for 'history' attribute (Provenance)
+    assert "history" in regridded_da.attrs
+    assert "Conservatively regridded" in regridded_da.attrs["history"]
