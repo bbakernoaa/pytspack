@@ -1,5 +1,7 @@
 import numpy as np
 import pytest
+import xarray as xr
+import dask.array as da
 from renka.renka import SphericalMesh
 
 
@@ -12,6 +14,11 @@ def test_benchmark_regrid_conservative_scaling_source(benchmark, num_points):
     lats = np.linspace(30.0, 45.0, num_points)
     lons = np.linspace(-90.0, -85.0, num_points)
     values = np.random.rand(num_points) * 10.0
+    values_da = xr.DataArray(
+        da.from_array(values, chunks="auto"),
+        dims=["points"],
+        coords={"lat": ("points", lats), "lon": ("points", lons)},
+    )
 
     # Initialize the spherical mesh
     mesh = SphericalMesh(lats, lons)
@@ -20,8 +27,11 @@ def test_benchmark_regrid_conservative_scaling_source(benchmark, num_points):
     grid_lats = np.linspace(30, 45, 16)
     grid_lons = np.linspace(-95, -85, 11)
 
-    # Benchmark the regridding function
-    benchmark(mesh.regrid_conservative, values, grid_lats, grid_lons)
+    # Benchmark the regridding function, including the .compute() call
+    def regrid_and_compute():
+        mesh.regrid_conservative(values_da, grid_lats, grid_lons).compute()
+
+    benchmark(regrid_and_compute)
 
 
 @pytest.mark.parametrize("grid_size", [10, 50, 100])
@@ -33,6 +43,11 @@ def test_benchmark_regrid_conservative_scaling_grid(benchmark, grid_size):
     lats = np.array([30.0, 45.0, 35.0, 40.0])
     lons = np.array([-90.0, -85.0, -95.0, -90.0])
     values = np.array([10.0, 20.0, 15.0, 18.0])
+    values_da = xr.DataArray(
+        da.from_array(values, chunks="auto"),
+        dims=["points"],
+        coords={"lat": ("points", lats), "lon": ("points", lons)},
+    )
 
     # Initialize the spherical mesh
     mesh = SphericalMesh(lats, lons)
@@ -41,8 +56,11 @@ def test_benchmark_regrid_conservative_scaling_grid(benchmark, grid_size):
     grid_lats = np.linspace(30, 45, grid_size)
     grid_lons = np.linspace(-95, -85, grid_size)
 
-    # Benchmark the regridding function
-    benchmark(mesh.regrid_conservative, values, grid_lats, grid_lons)
+    # Benchmark the regridding function, including the .compute() call
+    def regrid_and_compute():
+        mesh.regrid_conservative(values_da, grid_lats, grid_lons).compute()
+
+    benchmark(regrid_and_compute)
 
 
 @pytest.mark.parametrize("num_points", [10, 100, 1000])
