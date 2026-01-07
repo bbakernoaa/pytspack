@@ -11,11 +11,6 @@ librenka = Extension(
     name="renka._librenka",
     sources=[
         "src/tspack.c",
-        "src/stripack.c",
-        "src/ssrfpack.c",
-        "src/srfpack.c",
-        "src/tripack.c",
-        "src/renka.c",
     ],
     include_dirs=["src", numpy.get_include()],
     extra_compile_args=extra_args,
