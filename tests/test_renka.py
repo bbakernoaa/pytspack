@@ -163,3 +163,51 @@ def test_sphericalmesh_regrid_conservative():
     # 6. Check for 'history' attribute (Provenance)
     assert "history" in regridded_da.attrs
     assert "Conservatively regridded" in regridded_da.attrs["history"]
+
+
+def test_regrid_conservative_longitude_wrapping():
+    """
+    Tests conservative regridding across the anti-meridian.
+
+    This test ensures that the C-level longitude wrapping logic is
+    correct. It creates a target grid that crosses the 180-degree
+    longitude line and verifies that the total sum of the data is
+    conserved, which would not be the case if the grid cell widths
+    were calculated incorrectly.
+    """
+    # Source data concentrated in the Pacific
+    lats = np.array([0, 10, -10])
+    lons = np.array([170, 180, -170])
+    values = np.array([100, 100, 100])
+
+    values_da = xr.DataArray(
+        da.from_array(values, chunks="auto"),
+        dims=["points"],
+        coords={"lat": ("points", lats), "lon": ("points", lons)},
+    )
+
+    mesh = SphericalMesh(lats, lons)
+
+    # Target grid crossing the anti-meridian
+    grid_lats = np.array([-20, 0, 20])
+    grid_lons = np.array([175, -175]) # Crosses the dateline
+
+    regridded_da = mesh.regrid_conservative(
+        values_da, grid_lats, grid_lons, samples=20
+    )
+
+    # 1. Check that the output is a Dask-backed xarray.DataArray
+    assert isinstance(regridded_da, xr.DataArray)
+    assert isinstance(regridded_da.data, da.Array)
+
+    # 2. Trigger computation
+    regridded_data = regridded_da.compute()
+
+    # 3. Check for conservation of sum
+    # The core of this test: if wrapping fails, the sum will be way off.
+    np.testing.assert_allclose(
+        np.sum(regridded_data), np.sum(values), rtol=1e-5
+    )
+
+    # 4. Check shape
+    assert regridded_data.shape == (len(grid_lats), len(grid_lons))

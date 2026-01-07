@@ -1,4 +1,8 @@
+#define _USE_MATH_DEFINES
 #include <math.h>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include "ssrfpack.h"
@@ -1132,13 +1136,16 @@ void ssrf_conservative_regrid(int n, float *x, float *y, float *z, float *vals,
         float lon_min = plon[j];
         float d_lon;
 
+        float d_lon_full;
         if (j < nj - 1) {
-             /* Standard case: distance to next pixel */
-             d_lon = (plon[j+1] - plon[j]) / sub_samples;
+            d_lon_full = plon[j+1] - plon[j];
         } else {
-             /* Edge case: assume same width as previous pixel */
-             d_lon = (plon[j] - plon[j-1]) / sub_samples;
+            d_lon_full = plon[j] - plon[j-1];
         }
+        /* Handle longitude wrapping at dateline */
+        if (d_lon_full > (float)M_PI) d_lon_full -= 2.0f * (float)M_PI;
+        if (d_lon_full < -(float)M_PI) d_lon_full += 2.0f * (float)M_PI;
+        d_lon = d_lon_full / sub_samples;
 
         for (int i = 0; i < ni; i++) {
             /* Robust Boundary Logic for Latitude */

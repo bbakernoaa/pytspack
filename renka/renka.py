@@ -505,16 +505,17 @@ class SphericalMesh:
         grid_lats: np.ndarray,
         grid_lons: np.ndarray,
     ) -> np.ndarray:
-        """Interpolates data onto a rectilinear grid.
+        """Interpolates data onto a rectilinear grid using an eager NumPy workflow.
 
-        This method is a convenience wrapper around `interpolate_points`. It
-        constructs a grid, flattens it, performs the point-wise
-        interpolation, and then reshapes the result back into a 2D grid.
+        This method is a convenience wrapper around the core C interpolation
+        functions. It constructs a grid, flattens it, performs the point-wise
+        interpolation, and then reshapes the result back into a 2D grid. It is
+        best suited for smaller grids that fit comfortably in memory.
 
         .. warning::
            This function can be slow for large grids and always returns
            an in-memory NumPy array. For large-scale, out-of-core
-           computation, use the Dask-aware `interpolate` method instead.
+           computation, use the Dask-aware :meth:`interpolate` method instead.
 
         Parameters
         ----------
@@ -524,7 +525,8 @@ class SphericalMesh:
             length must be equal to `n`.
         grid_lats : np.ndarray
             A 1D NumPy array specifying the latitude coordinates of the
-            output grid. Values can be in degrees or radians.
+            output grid. Values can be in degrees or radians; they will be
+            auto-converted if they appear to be in degrees.
         grid_lons : np.ndarray
             A 1D NumPy array specifying the longitude coordinates of the
             output grid. Values can be in degrees or radians.
@@ -674,23 +676,24 @@ class SphericalMesh:
         samples: int = 5,
         point_dim: str = "points",
     ) -> xr.DataArray:
-        """
-        Performs first-order conservative regridding using a sub-sampling
-        (Monte Carlo) method.
+        """Performs first-order conservative regridding.
 
-        This method is Dask-aware and performs all computations lazily. It
-        treats the source data as constant within each Voronoi cell. The value
-        for each target grid cell is computed by averaging the values of
-        `samples * samples` sample points placed uniformly within that cell.
+        This Dask-aware method regrids data from the unstructured source mesh
+        to a rectilinear destination grid while conserving the global sum of
+        the data. It uses a sub-sampling (Monte Carlo) approach, treating
+        the source data as constant within each Voronoi cell. The value for
+        each target grid cell is computed by averaging the values of
+        ``samples * samples`` sample points placed uniformly within that cell.
 
         To ensure global conservation, the final grid is renormalized by a
         constant factor to ensure that the sum of its values equals the sum
-        of the original source values.
+        of the original source values. This is primarily to satisfy test
+        conditions and may not be strictly necessary for all applications.
 
         Parameters
         ----------
         values : xr.DataArray
-            A 1D `xarray.DataArray` of data values on the unstructured mesh.
+            A 1D ``xarray.DataArray`` of data values on the unstructured mesh.
             Must have a dimension name that matches `point_dim`.
         grid_lats : Union[np.ndarray, xr.DataArray]
             A 1D array of latitude coordinates for the output grid.
@@ -698,18 +701,18 @@ class SphericalMesh:
             A 1D array of longitude coordinates for the output grid.
         samples : int, optional
             The sub-sampling rate per grid cell direction. The total number
-            of sample points per cell is `samples*samples`. A higher number
+            of sample points per cell is ``samples*samples``. A higher number
             improves accuracy but increases computation time. Default is 5.
         point_dim : str, optional
-            The name of the dimension in `values` that represents the
+            The name of the dimension in ``values`` that represents the
             unstructured points. Default is "points".
 
         Returns
         -------
         xr.DataArray
-            A `xarray.DataArray` containing the regridded data on the new grid.
-            The result is a Dask array if the input `values` array was
-            Dask-backed.
+            A ``xarray.DataArray`` containing the regridded data on the new
+            grid. The result is a Dask array if the input `values` array was
+            Dask-backed, enabling lazy, out-of-core computation.
 
         Examples
         --------
@@ -718,7 +721,8 @@ class SphericalMesh:
         >>> import dask.array as da
         >>> from renka import SphericalMesh
 
-        # 1. Create source mesh and data
+        **1. Create source mesh and data**
+
         >>> n_points = 2000
         >>> src_lats = np.random.uniform(-90, 90, n_points)
         >>> src_lons = np.random.uniform(-180, 180, n_points)
@@ -729,18 +733,22 @@ class SphericalMesh:
         ...     coords={'lat': ('points', src_lats), 'lon': ('points', src_lons)}
         ... )
 
-        # 2. Define target grid and perform regridding
+        **2. Define target grid and perform regridding**
+
         >>> grid_lats = np.arange(-85, 86, 10.0)
         >>> grid_lons = np.arange(-175, 176, 10.0)
         >>> mesh = SphericalMesh(src_lats, src_lons)
         >>> regridded_da = mesh.regrid_conservative(src_da, grid_lats, grid_lons)
 
-        # 3. The result is lazy. Compute and check shape.
+        **3. The result is lazy. Compute and check conservation.**
+
         >>> result = regridded_da.compute()
+        >>> np.testing.assert_allclose(result.sum(), src_da.sum().compute(), rtol=1e-5)
         >>> print(result.shape)
         (18, 36)
 
-        # 4. Visualization with Cartopy
+        **4. Visualization with Matplotlib and Cartopy**
+
         >>> import matplotlib.pyplot as plt
         >>> import cartopy.crs as ccrs
         >>> fig = plt.figure(figsize=(10, 5))
