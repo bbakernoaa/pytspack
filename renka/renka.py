@@ -89,15 +89,47 @@ class SphericalMesh:
         lons: Union[np.ndarray, "dask.array.Array"],
         n_partitions: int = 1,
     ):
-        if hasattr(lats, "dask"):
-            self.n = lats.shape[0]
-        else:
-            self.n = len(lats)
+        """
+        Initializes a spherical mesh for interpolation.
 
-        self.lats = lats
-        self.lons = lons
-        self.n_partitions = n_partitions
-        self._triangulated = False
+        This class builds a Delaunay triangulation of unstructured points on a
+        sphere, which can then be used for high-performance interpolation or
+        conservative regridding. It serves as a Python wrapper around the
+        FORTRAN STRIPACK and SSRFPACK libraries.
+
+        Parameters
+        ----------
+        lats : Union[np.ndarray, "dask.array.Array"]
+            A 1D array of latitude coordinates for the unstructured grid nodes.
+            Values can be in degrees or radians; they will be auto-detected
+            and converted to radians internally. Can be a Dask array for
+            lazy computation.
+        lons : Union[np.ndarray, "dask.array.Array"]
+            A 1D array of longitude coordinates for the unstructured grid
+            nodes. Must be the same size as `lats`. Can be a Dask array.
+        n_partitions : int, optional
+            If greater than 1, the mesh will be partitioned for potentially
+            faster processing on very large datasets. This feature is
+            experimental. Default is 1.
+        """
+        self.lats: Union[np.ndarray, "dask.array.Array"] = lats
+        self.lons: Union[np.ndarray, "dask.array.Array"] = lons
+        self.n_partitions: int = n_partitions
+        self._triangulated: bool = False
+
+        if hasattr(lats, "dask"):
+            self.n: int = lats.shape[0]
+        else:
+            self.n: int = len(lats)
+
+        # C-level triangulation arrays, initialized later
+        self.x: np.ndarray
+        self.y: np.ndarray
+        self.z: np.ndarray
+        self.list: np.ndarray
+        self.lptr: np.ndarray
+        self.lend: np.ndarray
+
         self._bind()
 
     def _build_partitioned_mesh(self):
@@ -136,6 +168,18 @@ class SphericalMesh:
         return x, y, z
 
     def _compute_mesh(self):
+        """
+        Computes the Delaunay triangulation of the spherical mesh.
+
+        This method is called internally when interpolation is first requested.
+        It converts latitude/longitude coordinates to Cartesian (X, Y, Z),
+        invokes the STRIPACK C library to perform the triangulation, and
+        stores the resulting triangulation structure (adjacency lists) in
+        memory for subsequent interpolation calls.
+
+        The method ensures that triangulation is only performed once. If
+        called again, it will have no effect.
+        """
         if self._triangulated:
             return
 
@@ -188,6 +232,28 @@ class SphericalMesh:
         self._triangulated = True
 
     def _check_and_convert(self, arr: np.ndarray, is_lat: bool = False) -> np.ndarray:
+        """
+        Ensures an array is a contiguous float64 array and converts from
+        degrees to radians if necessary.
+
+        This utility function uses a simple heuristic to guess whether the input
+        coordinate array is in degrees or radians. If the absolute maximum
+        value exceeds a plausible radian value (1.6 for latitude, 6.3 for
+        longitude), it assumes the input is in degrees and converts it.
+
+        Parameters
+        ----------
+        arr : np.ndarray
+            The input coordinate array (latitude or longitude).
+        is_lat : bool, optional
+            A flag indicating if the array contains latitude values, which
+            influences the heuristic for unit detection. Default is False.
+
+        Returns
+        -------
+        np.ndarray
+            A contiguous float64 NumPy array with values in radians.
+        """
         arr = np.ascontiguousarray(arr, dtype=np.float64)
         max_val = np.nanmax(np.abs(arr))
         # Heuristic to detect if input is degrees and convert to radians
@@ -561,7 +627,9 @@ class SphericalMesh:
         This is the core interpolation function that operates on unstructured
         target points (e.g., satellite tracks, ship tracks). It computes
         gradients on the source mesh and then performs point-wise
-        interpolation using the Renka C library functions.
+        interpolation using the Renka C library functions. This "vec" version
+        is optimized to call a vectorized C function (`ssrf_intrc1_vec`),
+        which avoids Python-level loops for much higher performance.
 
         Parameters
         ----------
