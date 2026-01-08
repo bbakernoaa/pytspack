@@ -3,6 +3,7 @@ import numpy as np
 import datetime
 from typing import Union
 
+
 def _interp1d(y_slice, x_coords, x_new_coords, method):
     """
     Wrapper for 1D interpolation that handles linear and log methods.
@@ -30,9 +31,11 @@ def _interp1d(y_slice, x_coords, x_new_coords, method):
     y_slice_sorted = y_slice[sorted_indices]
     x_coords_sorted = x_coords[sorted_indices]
 
-    if method == 'log':
+    if method == "log":
         if np.any(x_coords <= 0) or np.any(x_new_coords <= 0):
-            raise ValueError("Log interpolation requires all coordinate values to be positive.")
+            raise ValueError(
+                "Log interpolation requires all coordinate values to be positive."
+            )
         return np.interp(
             np.log(x_new_coords),
             np.log(x_coords_sorted),
@@ -40,7 +43,7 @@ def _interp1d(y_slice, x_coords, x_new_coords, method):
             left=np.nan,
             right=np.nan,
         )
-    elif method == 'linear':
+    elif method == "linear":
         return np.interp(
             x_new_coords,
             x_coords_sorted,
@@ -50,6 +53,7 @@ def _interp1d(y_slice, x_coords, x_new_coords, method):
         )
     else:
         raise ValueError(f"Unknown interpolation method: '{method}'")
+
 
 def interpolate_vertical(
     data: Union[xr.DataArray, xr.Dataset],
