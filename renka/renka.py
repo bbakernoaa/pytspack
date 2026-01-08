@@ -83,12 +83,56 @@ class TsPack:
 
 
 class SphericalMesh:
+    """
+    Manages a spherical mesh for triangulation and interpolation.
+
+    This class provides a high-level interface to Renka's C libraries
+    (STRIPACK, SSRFPACK) for performing triangulation of scattered data points
+    on a sphere and for interpolating this data onto new points or grids.
+
+    It is designed to be lazy and scalable, integrating with Dask to handle
+    datasets that are larger than memory. All geographic coordinates (lats,
+    lons) are handled in radians internally, but the class will automatically
+
+    convert inputs from degrees if they are detected.
+
+    Attributes
+    ----------
+    n : int
+        The number of nodes in the mesh.
+    lats : Union[np.ndarray, "dask.array.Array"]
+        The latitude coordinates of the mesh nodes.
+    lons : Union[np.ndarray, "dask.array.Array"]
+        The longitude coordinates of the mesh nodes.
+    """
     def __init__(
         self,
         lats: Union[np.ndarray, "dask.array.Array"],
         lons: Union[np.ndarray, "dask.array.Array"],
         n_partitions: int = 1,
     ):
+        """
+        Initializes the SphericalMesh.
+
+        This constructor sets up the mesh with the given latitude and longitude
+        points. The actual triangulation is deferred until it is needed (e.g.,
+        when an interpolation method is called).
+
+        Parameters
+        ----------
+        lats : Union[np.ndarray, "dask.array.Array"]
+            A 1D array of latitude coordinates for the unstructured mesh
+            nodes. Values can be in degrees or radians; the constructor
+            will attempt to auto-detect and convert to radians if needed.
+        lons : Union[np.ndarray, "dask.array.Array"]
+            A 1D array of longitude coordinates for the unstructured mesh
+            nodes. Must be the same length as `lats`. Values can be in
+            degrees or radians.
+        n_partitions : int, optional
+            If greater than 1, the mesh will be partitioned for potentially
+            faster processing on very large datasets. This feature is
+            experimental. Default is 1 (no partitioning).
+        """
         if hasattr(lats, "dask"):
             self.n = lats.shape[0]
         else:
@@ -505,10 +549,11 @@ class SphericalMesh:
         grid_lats: np.ndarray,
         grid_lons: np.ndarray,
     ) -> np.ndarray:
-        """Interpolates data onto a rectilinear grid.
+        """
+        Interpolates data onto a rectilinear grid and returns a NumPy array.
 
-        This method is a convenience wrapper around `interpolate_points`. It
-        constructs a grid, flattens it, performs the point-wise
+        This method is a convenience wrapper for eager, in-memory computation.
+        It constructs a grid, flattens it, performs the point-wise
         interpolation, and then reshapes the result back into a 2D grid.
 
         .. warning::
@@ -550,18 +595,14 @@ class SphericalMesh:
     def interpolate_points(
         self, values: np.ndarray, point_lats: np.ndarray, point_lons: np.ndarray
     ) -> np.ndarray:
-        return self.interpolate_points_vec(values, point_lats, point_lons)
-
-    def interpolate_points_vec(
-        self, values: np.ndarray, point_lats: np.ndarray, point_lons: np.ndarray
-    ) -> np.ndarray:
         """
-        Interpolates data from the source mesh to a set of target points.
+        Interpolates mesh data to a list of unstructured points.
 
-        This is the core interpolation function that operates on unstructured
-        target points (e.g., satellite tracks, ship tracks). It computes
-        gradients on the source mesh and then performs point-wise
-        interpolation using the Renka C library functions.
+        This is the core, vectorized interpolation function that operates on
+        unstructured target points (e.g., satellite tracks, ship tracks). It
+        first computes gradients on the source mesh and then performs the
+        point-wise interpolation using the vectorized C function
+        `ssrf_intrc1_vec`.
 
         Parameters
         ----------
@@ -584,8 +625,44 @@ class SphericalMesh:
         ValueError
             If `point_lats` and `point_lons` have different lengths.
         RuntimeError
-            If the underlying C functions for gradient calculation or
-            interpolation return an error.
+            If the underlying C functions return an error.
+        """
+        return self.interpolate_points_vec(values, point_lats, point_lons)
+
+    def interpolate_points_vec(
+        self, values: np.ndarray, point_lats: np.ndarray, point_lons: np.ndarray
+    ) -> np.ndarray:
+        """
+        Interpolates mesh data to a list of unstructured points.
+
+        This is the core, vectorized interpolation function that operates on
+        unstructured target points (e.g., satellite tracks, ship tracks). It
+        first computes gradients on the source mesh and then performs the
+        point-wise interpolation using the vectorized C function
+        `ssrf_intrc1_vec`.
+
+        Parameters
+        ----------
+        values : np.ndarray
+            A 1D array of data values at the source mesh nodes (`self.lats`,
+            `self.lons`). Must have length `n`.
+        point_lats : np.ndarray
+            A 1D array of latitude coordinates for the target points.
+        point_lons : np.ndarray
+            A 1D array of longitude coordinates for the target points. Must
+            have the same length as `point_lats`.
+
+        Returns
+        -------
+        np.ndarray
+            A 1D array of interpolated values at the target points.
+
+        Raises
+        ------
+        ValueError
+            If `point_lats` and `point_lons` have different lengths.
+        RuntimeError
+            If the underlying C functions return an error.
         """
         self._compute_mesh()
 
