@@ -89,6 +89,44 @@ class SphericalMesh:
         lons: Union[np.ndarray, "dask.array.Array"],
         n_partitions: int = 1,
     ):
+        """
+        Initializes a spherical mesh for scattered data interpolation.
+
+        This class builds a Delaunay triangulation of unstructured points on
+        the surface of a sphere. The resulting mesh is used as the basis for
+        high-performance interpolation and regridding operations.
+
+        The constructor is lazy and does not perform the actual triangulation
+        until a method like `interpolate` or `regrid_conservative` is
+        called. This minimizes upfront computation.
+
+        Parameters
+        ----------
+        lats : Union[np.ndarray, "dask.array.Array"]
+            A 1D array of latitude coordinates for the unstructured mesh
+            points. Values can be in degrees or radians; the class will
+            automatically detect and convert degrees to radians.
+        lons : Union[np.ndarray, "dask.array.Array"]
+            A 1D array of longitude coordinates for the unstructured mesh
+            points. Values can be in degrees or radians.
+        n_partitions : int, optional
+            If greater than 1, the mesh is partitioned into `n_partitions`
+            sub-meshes for potentially faster processing on very large
+            datasets. This feature is experimental. Default is 1.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from renka import SphericalMesh
+        # Create random points on a sphere
+        >>> n_points = 1000
+        >>> src_lats = np.random.uniform(-90, 90, n_points)
+        >>> src_lons = np.random.uniform(-180, 180, n_points)
+        # Initialize the mesh
+        >>> mesh = SphericalMesh(src_lats, src_lons)
+        >>> print(f"Mesh created with {mesh.n} points.")
+        Mesh created with 1000 points.
+        """
         if hasattr(lats, "dask"):
             self.n = lats.shape[0]
         else:
@@ -505,16 +543,14 @@ class SphericalMesh:
         grid_lats: np.ndarray,
         grid_lons: np.ndarray,
     ) -> np.ndarray:
-        """Interpolates data onto a rectilinear grid.
+        """
+        Interpolates data onto a rectilinear grid (eager execution).
 
-        This method is a convenience wrapper around `interpolate_points`. It
-        constructs a grid, flattens it, performs the point-wise
-        interpolation, and then reshapes the result back into a 2D grid.
-
-        .. warning::
-           This function can be slow for large grids and always returns
-           an in-memory NumPy array. For large-scale, out-of-core
-           computation, use the Dask-aware `interpolate` method instead.
+        This method provides a simple, NumPy-native interface for
+        interpolation. It constructs a grid, flattens it, performs
+        point-wise interpolation, and reshapes the result back into a 2D
+        grid. The entire operation is performed eagerly and returns an
+        in-memory NumPy array.
 
         Parameters
         ----------
@@ -535,6 +571,33 @@ class SphericalMesh:
             A 2D NumPy array of shape `(len(grid_lats), len(grid_lons))`
             containing the interpolated values. Points outside the convex
             hull of the data will be `np.nan`.
+
+        Notes
+        -----
+        This function can be slow for large grids as it is not parallelized
+        and does not use Dask. For large-scale, out-of-core computation,
+        use the Dask-aware `interpolate` method instead.
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> from renka import SphericalMesh
+        # 1. Create a source mesh and data
+        >>> n_points = 500
+        >>> src_lats = np.random.uniform(-90, 90, n_points)
+        >>> src_lons = np.random.uniform(-180, 180, n_points)
+        >>> src_values = np.sin(np.deg2rad(src_lats)) * np.cos(np.deg2rad(src_lons))
+        # 2. Define the target grid
+        >>> grid_lats = np.arange(-90, 91, 10) # Coarse 10-degree grid
+        >>> grid_lons = np.arange(-180, 181, 10)
+        # 3. Initialize the mesh and interpolate
+        >>> mesh = SphericalMesh(src_lats, src_lons)
+        >>> result_grid = mesh.interpolate_to_numpy_grid(src_values, grid_lats, grid_lons)
+        >>> print(f"Output grid shape: {result_grid.shape}")
+        Output grid shape: (19, 37)
+        >>> # Check that the output is a NumPy array
+        >>> print(isinstance(result_grid, np.ndarray))
+        True
         """
         # Create a meshgrid and flatten it for point-wise interpolation
         lon_grid, lat_grid = np.meshgrid(grid_lons, grid_lats)
