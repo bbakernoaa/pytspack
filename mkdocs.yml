@@ -1,4 +1,4 @@
-site_name: renka
+site_name: pytspack
 theme:
   name: material
 plugins:
