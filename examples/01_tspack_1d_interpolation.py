@@ -3,9 +3,9 @@
 1D Interpolation with TsPack
 ==============================
 
-This example demonstrates how to use the `renka.TsPack` class to perform
+This example demonstrates how to use the `pytspack.TsPack` class to perform
 one-dimensional spline interpolation. This class is a Python wrapper around
-the tensioned spline interpolation routines from the TSPACK Fortran library.
+the tensioned spline interpolation routines from the TSPACK library.
 
 The script will:
 1.  Generate a set of sparse, noisy data points based on a sine wave.
@@ -17,7 +17,7 @@ The script will:
 
 import numpy as np
 import matplotlib.pyplot as plt
-from renka import TsPack
+from pytspack import TsPack
 
 # 1. Generate some sparse, noisy sample data
 np.random.seed(0)
@@ -53,7 +53,7 @@ plt.plot(
 )
 
 
-plt.title("1D Spline Interpolation with renka.TsPack")
+plt.title("1D Spline Interpolation with pytspack.TsPack")
 plt.xlabel("X Coordinate")
 plt.ylabel("Y Coordinate")
 plt.legend()
