@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0.0", "wheel", "numpy>=1.21.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "renka"
-version = "0.2.0"
-description = "High-performance C port of Renka triangulation and interpolation algorithms"
+name = "pytspack"
+version = "0.1.0"
+description = "Python interface for Robert J. Renka's TSPACK: Tension Spline Curve Fitting Package"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
@@ -14,7 +14,6 @@ dependencies = [
     "xarray",
     "dask",
     "setuptools",
-    "scipy",
 ]
 
 [project.optional-dependencies]

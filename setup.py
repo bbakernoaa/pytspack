@@ -7,21 +7,17 @@ extra_args = ["-std=c99", "-O3"]
 if os.name != "nt":
     extra_args.append("-fPIC")
 
-librenka = Extension(
-    name="renka._librenka",
+libpytspack = Extension(
+    name="pytspack._libpytspack",
     sources=[
         "src/tspack.c",
-        "src/stripack.c",
-        "src/ssrfpack.c",
-        "src/srfpack.c",
-        "src/tripack.c",
-        "src/renka.c",
+        "src/pytspack.c",
     ],
     include_dirs=["src", numpy.get_include()],
     extra_compile_args=extra_args,
 )
 
 setup(
-    ext_modules=[librenka],
-    packages=["renka"],
+    ext_modules=[libpytspack],
+    packages=["pytspack"],
 )

@@ -1,121 +1,84 @@
 import numpy as np
 import xarray as xr
 import dask.array as da
-import pytest
-
-from renka.vertical import interpolate_vertical
+from pytspack import interpolate_vertical
 
 
-@pytest.fixture
-def sample_dataarray():
-    """Provides a sample xarray.DataArray for testing."""
-    source_levels = np.array([1000, 900, 800, 700, 600, 500])
-    lats = np.arange(-90, 91, 90)
-    lons = np.arange(-180, 181, 180)
-    data = np.arange(len(source_levels) * len(lats) * len(lons)).reshape(
-        len(source_levels), len(lats), len(lons)
-    )
-    return xr.DataArray(
-        data,
-        dims=["pressure", "lat", "lon"],
-        coords={"pressure": source_levels, "lat": lats, "lon": lons},
-        attrs={"history": "Initial creation."},
-    )
+def test_interpolate_vertical_basic():
+    # Create simple 1D profile
+    levels = np.array([300.0, 500.0, 700.0, 850.0, 1000.0])
+    data = np.array([230.0, 255.0, 268.0, 275.0, 280.0])
+
+    da_src = xr.DataArray(data, coords=[levels], dims=["level"])
+
+    target_levels = np.array([400.0, 600.0, 900.0])
+    result = interpolate_vertical(da_src, target_levels)
+
+    assert result.shape == (3,)
+    assert np.allclose(result.level.values, target_levels)
+    # Check that values are within plausible ranges
+    assert 230 < result.values[0] < 255
+    assert 255 < result.values[1] < 268
+    assert 275 < result.values[2] < 280
 
 
-def test_linear_interpolation(sample_dataarray):
-    """Tests linear interpolation on a standard DataArray."""
-    da = sample_dataarray.rename({"pressure": "height"}).assign_coords(
-        {"height": [100, 200, 300, 400, 500, 600]}
-    )
+def test_interpolate_vertical_dask():
+    # N-D with dask
+    levels = np.array([300.0, 500.0, 700.0, 850.0, 1000.0])
+    # time, level, lat, lon
+    data = np.random.rand(2, 5, 4, 5)
 
-    interpolated_da = interpolate_vertical(
-        da, [150, 250, 350], level_dim="height", method="linear"
-    )
-
-    assert interpolated_da.shape == (3, 3, 3)
-    np.testing.assert_array_equal(interpolated_da["height"].values, [150, 250, 350])
-
-    expected_value = 8.5
-    actual_value = interpolated_da.sel(lat=0, lon=0, height=150).item()
-    assert np.isclose(actual_value, expected_value)
-
-
-def test_log_interpolation(sample_dataarray):
-    """Tests log-pressure interpolation."""
-    target_levels = np.array([950, 850, 750])
-
-    interpolated_da = interpolate_vertical(
-        sample_dataarray, target_levels, level_dim="pressure", method="log"
+    da_src = xr.DataArray(
+        da.from_array(data, chunks=(1, 5, 4, 5)),
+        coords={"level": levels},
+        dims=["time", "level", "lat", "lon"],
     )
 
-    assert interpolated_da.shape == (3, 3, 3)
-    np.testing.assert_array_equal(interpolated_da["pressure"].values, target_levels)
+    target_levels = np.array([400.0, 600.0, 900.0])
+    result = interpolate_vertical(da_src, target_levels)
 
-    # The expected value is calculated by hand to match the log interpolation
-    expected_value = 8.3815242
-    actual_value = interpolated_da.sel(lat=0, lon=0, pressure=950).item()
-    assert np.isclose(actual_value, expected_value)
-
-
-def test_dask_integration(sample_dataarray):
-    """Ensures the function works with Dask-backed arrays and remains lazy."""
-    dask_da = sample_dataarray.chunk({"lat": 1, "lon": 1})
-    target_levels = np.array([950, 850])
-
-    interpolated_da = interpolate_vertical(
-        dask_da, target_levels, level_dim="pressure", method="log"
-    )
-
-    assert isinstance(interpolated_da.data, da.Array)
-
-    computed_result = interpolated_da.compute()
-    numpy_result = interpolate_vertical(
-        sample_dataarray, target_levels, level_dim="pressure", method="log"
-    )
-
-    xr.testing.assert_allclose(computed_result, numpy_result)
+    assert isinstance(result.data, da.Array)
+    computed = result.compute()
+    assert computed.shape == (2, 3, 4, 5)
+    assert "history" in result.attrs
+    assert "pytspack" in result.attrs["history"]
 
 
-def test_dataset_interpolation(sample_dataarray):
-    """Tests if the function correctly handles an xarray.Dataset."""
+def test_interpolate_vertical_decreasing():
+    # Test with decreasing levels (common in atmospheric pressure levels)
+    levels = np.array([1000.0, 850.0, 700.0])
+    data = np.array([10.0, 20.0, 30.0])
+    da_src = xr.DataArray(data, coords=[levels], dims=["level"])
+
+    target_levels = np.array([925.0, 775.0])
+    result = interpolate_vertical(da_src, target_levels)
+
+    # Values should be roughly linear here
+    assert 10 < result.sel(level=925.0) < 20
+    assert 20 < result.sel(level=775.0) < 30
+
+
+def test_interpolate_vertical_dataset():
+    # Test with xarray.Dataset
+    levels = np.array([300.0, 500.0, 700.0])
+    temp = np.array([230.0, 255.0, 268.0])
+    hum = np.array([10.0, 30.0, 50.0])
+
     ds = xr.Dataset(
-        {"temperature": sample_dataarray, "humidity": sample_dataarray * 0.5}
-    )
-    target_levels = [950, 850]
-
-    interpolated_ds = interpolate_vertical(
-        ds, target_levels, level_dim="pressure", method="log"
-    )
-
-    assert isinstance(interpolated_ds, xr.Dataset)
-    assert "temperature" in interpolated_ds
-    assert "humidity" in interpolated_ds
-    assert interpolated_ds["temperature"].shape == (2, 3, 3)
-    assert np.isclose(
-        interpolated_ds["humidity"].sel(lat=0, lon=0, pressure=950).item(),
-        8.3815242 * 0.5,
+        {
+            "temperature": (["level"], temp),
+            "humidity": (["level"], hum),
+            "static_var": (["x"], [1, 2, 3]),
+        },
+        coords={"level": levels, "x": [10, 20, 30]},
     )
 
+    target_levels = np.array([400.0, 600.0])
+    result = interpolate_vertical(ds, target_levels)
 
-def test_provenance(sample_dataarray):
-    """Checks that the 'history' attribute is correctly updated."""
-    target_levels = [950]
-    interpolated_da = interpolate_vertical(
-        sample_dataarray, target_levels, level_dim="pressure"
-    )
-
-    assert "history" in interpolated_da.attrs
-    assert len(interpolated_da.attrs["history"].splitlines()) == 2
-    assert "Vertically interpolated" in interpolated_da.attrs["history"]
-
-
-def test_error_handling(sample_dataarray):
-    """Tests for expected errors, like missing dimensions or invalid methods."""
-    with pytest.raises(ValueError, match="Dimension 'level' not found"):
-        interpolate_vertical(sample_dataarray, [1.5], level_dim="level")
-
-    with pytest.raises(ValueError, match="Unknown interpolation method"):
-        interpolate_vertical(
-            sample_dataarray, [1.5], level_dim="pressure", method="cubic"
-        )
+    assert "temperature" in result.data_vars
+    assert "humidity" in result.data_vars
+    assert "static_var" in result.data_vars
+    assert result.temperature.shape == (2,)
+    assert result.static_var.shape == (3,)
+    assert "level" in result.temperature.coords

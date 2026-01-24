@@ -1,14 +1,6 @@
-# renka
+# pytspack
 
-A high-performance Python wrapper for Robert J. Renka's C libraries for triangulation and interpolation, including:
-
-*   **TSPACK:** Tension Spline Curve Fitting
-*   **STRIPACK:** Delaunay Triangulation on a Sphere
-*   **SSRFPACK:** Scattered Data Interpolation on a Sphere
-*   **SRFPACK:** Scattered Data Interpolation on a Plane
-*   **TRIPACK:** Planar Triangulation
-
-This package provides direct access to the C functions, enabling high-performance geospatial and scientific computing in Python.
+A high-performance Python wrapper for Robert J. Renka's C library for tension spline curve fitting (TSPACK).
 
 ## Installation
 
@@ -22,7 +14,7 @@ For most users, a simple `pip` install from the repository root will work:
 pip install .
 ```
 
-This command compiles the C extension and installs the `renka` package into your active Python environment.
+This command compiles the C extension and installs the `pytspack` package into your active Python environment.
 
 ### Editable Mode
 
@@ -32,7 +24,21 @@ For development, install the package in editable mode:
 pip install -e .
 ```
 
-This allows you to modify the Python wrapper code and have the changes immediately reflected without reinstalling.
+## Usage
+
+```python
+import numpy as np
+from pytspack import TsPack
+
+x = np.array([0.0, 1.0, 2.0, 3.0])
+y = np.array([0.0, 1.0, 0.0, 1.0])
+
+tspack = TsPack()
+interpolator = tspack.interpolate(x, y, tension=2.0)
+
+test_points = np.linspace(0, 3, 100)
+results = interpolator(test_points)
+```
 
 ## Disclaimer
 

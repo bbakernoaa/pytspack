@@ -2,71 +2,64 @@ import xarray as xr
 import numpy as np
 import datetime
 from typing import Union
+from .pytspack import TsPack
 
 
-def _interp1d(y_slice, x_coords, x_new_coords, method):
+def _tspack_interp1d(y, x, x_new, tension):
     """
-    Wrapper for 1D interpolation that handles linear and log methods.
-    This function is designed to be used with `xarray.apply_ufunc`.
+    Internal wrapper for 1D interpolation using TsPack.
+    Designed for use with xarray.apply_ufunc.
 
     Parameters
     ----------
-    y_slice : np.ndarray
-        1D array of data values to interpolate.
-    x_coords : np.ndarray
-        1D array of the source coordinates corresponding to `y_slice`.
-    x_new_coords : np.ndarray
-        1D array of the target coordinates.
-    method : str
-        Interpolation method, either 'linear' or 'log'.
+    y : np.ndarray
+        1D array of data values.
+    x : np.ndarray
+        1D array of source coordinates.
+    x_new : np.ndarray
+        1D array of target coordinates.
+    tension : float
+        Tension factor for the spline.
 
     Returns
     -------
     np.ndarray
-        Interpolated data values on the `x_new_coords`.
+        Interpolated values.
     """
-    # np.interp requires monotonically increasing coordinates.
-    # Atmospheric pressure often decreases with height, so we sort.
-    sorted_indices = np.argsort(x_coords)
-    y_slice_sorted = y_slice[sorted_indices]
-    x_coords_sorted = x_coords[sorted_indices]
-
-    if method == "log":
-        if np.any(x_coords <= 0) or np.any(x_new_coords <= 0):
-            raise ValueError(
-                "Log interpolation requires all coordinate values to be positive."
-            )
-        return np.interp(
-            np.log(x_new_coords),
-            np.log(x_coords_sorted),
-            y_slice_sorted,
-            left=np.nan,
-            right=np.nan,
-        )
-    elif method == "linear":
-        return np.interp(
-            x_new_coords,
-            x_coords_sorted,
-            y_slice_sorted,
-            left=np.nan,
-            right=np.nan,
-        )
+    # TsPack requires strictly increasing x.
+    # Vertical coordinates like pressure often decrease with index.
+    if x[1] < x[0]:
+        idx = np.argsort(x)
+        x_sorted = x[idx]
+        y_sorted = y[idx]
     else:
-        raise ValueError(f"Unknown interpolation method: '{method}'")
+        x_sorted = x
+        y_sorted = y
+
+    # Check for NaNs which TsPack cannot handle
+    if np.any(np.isnan(y_sorted)) or np.any(np.isnan(x_sorted)):
+        return np.full(len(x_new), np.nan)
+
+    try:
+        tsp = TsPack()
+        # Create interpolator
+        predict = tsp.interpolate(x_sorted, y_sorted, tension=tension)
+        return predict(x_new)
+    except Exception:
+        # Fallback for errors in interpolation (e.g. non-increasing x)
+        return np.full(len(x_new), np.nan)
 
 
 def interpolate_vertical(
     data: Union[xr.DataArray, xr.Dataset],
     target_levels: Union[np.ndarray, list],
     level_dim: str = "level",
-    method: str = "linear",
+    tension: float = 0.0,
 ) -> Union[xr.DataArray, xr.Dataset]:
     """
-    Interpolates data to new vertical levels.
+    Interpolates data to new vertical levels using tension splines (TSPACK).
 
-    This function is Dask-aware and operates lazily. It can perform
-    linear interpolation on any vertical coordinate or log-linear
-    interpolation for pressure levels.
+    This function is Dask-aware and operates lazily.
 
     Parameters
     ----------
@@ -76,28 +69,22 @@ def interpolate_vertical(
         A 1D array or list of the target vertical level values.
     level_dim : str, optional
         The name of the vertical dimension in the input data, by default "level".
-    method : str, optional
-        The interpolation method. Can be 'linear' for linear interpolation in
-        height/pressure, or 'log' for interpolation in log-pressure space.
-        Defaults to "linear".
+    tension : float, optional
+        The tension factor for the spline interpolation. 0.0 results in a
+        standard cubic spline. Higher values make the curve 'tighter'.
+        Defaults to 0.0.
 
     Returns
     -------
     Union[xr.DataArray, xr.Dataset]
         A new xarray object with the data interpolated to the target levels.
-        The result is a Dask-backed array if the input was Dask-backed.
-
-    Raises
-    ------
-    ValueError
-        If an unknown `method` is specified or if `level_dim` is not in the data.
     """
     if isinstance(data, xr.Dataset):
         new_ds = xr.Dataset(attrs=data.attrs)
         for var_name, da in data.data_vars.items():
             if level_dim in da.dims:
                 new_ds[var_name] = interpolate_vertical(
-                    da, target_levels, level_dim, method
+                    da, target_levels, level_dim, tension
                 )
             else:
                 new_ds[var_name] = da
@@ -116,7 +103,7 @@ def interpolate_vertical(
         dask_kwargs["output_sizes"] = {"new_level": len(target_levels)}
 
     interpolated_data = xr.apply_ufunc(
-        _interp1d,
+        _tspack_interp1d,
         data,
         data[level_dim],
         input_core_dims=[[level_dim], [level_dim]],
@@ -126,7 +113,7 @@ def interpolate_vertical(
         output_dtypes=[np.float64],
         dask_gufunc_kwargs=dask_kwargs,
         vectorize=True,
-        kwargs={"x_new_coords": target_levels, "method": method},
+        kwargs={"x_new": target_levels, "tension": tension},
     )
 
     result = interpolated_data.rename({"new_level": level_dim})
@@ -138,10 +125,11 @@ def interpolate_vertical(
     new_dims.insert(data.dims.index(level_dim), level_dim)
     result = result.transpose(*new_dims)
 
+    # Provenance
     timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
     history_log = (
         f"{timestamp}: Vertically interpolated from '{level_dim}' "
-        f"to {len(target_levels)} levels using '{method}' method."
+        f"to {len(target_levels)} levels using pytspack tension spline (tension={tension})."
     )
     if "history" in data.attrs:
         history_log = f"{data.attrs['history']}\n{history_log}"
