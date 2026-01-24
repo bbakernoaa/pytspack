@@ -1,2 +1,28 @@
 [build-system]
-requires = ["setuptools<65", "wheel", "numpy"]
+requires = ["setuptools>=61.0.0", "wheel", "numpy>=1.21.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytspack"
+version = "0.1.0"
+description = "Python interface for Robert J. Renka's TSPACK: Tension Spline Curve Fitting Package"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = [
+    "numpy>=1.21.0",
+    "xarray",
+    "dask",
+]
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+]
+test = [
+    "pytest",
+    "pytest-benchmark",
+    "ruff",
+]
