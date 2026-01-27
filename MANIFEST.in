@@ -1,0 +1,4 @@
+include src/*.h
+include src/*.c
+include LICENSE
+include README.md

@@ -100,7 +100,10 @@ class TsPack:
         def predict(t):
             t = np.ascontiguousarray(t, dtype=np.float64)
             res = np.zeros(len(t), dtype=np.float64)
-            _lib.tsval1(n, x, y, yp, sigma, 0, len(t), t, res, byref(c_int()))
+            ier = c_int()
+            _lib.tsval1(n, x, y, yp, sigma, 0, len(t), t, res, byref(ier))
+            if ier.value < 0:
+                raise ValueError(f"TSPACK Error (tsval1): {ier.value}")
             return res
 
         return predict

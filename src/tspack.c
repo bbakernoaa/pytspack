@@ -451,6 +451,10 @@ void tspsi(int n, double* x, double* y, int ncd, int iendc, int per, int unifrm,
                 int icnt;
 
                 double* yp_old = (double*)malloc(n * sizeof(double));
+                if (!yp_old) {
+                    *ier = -5; // Memory allocation failure
+                    return;
+                }
                 for(int i=0; i<n; ++i) yp_old[i] = yp[i];
 
                 sigs(n, x, y, yp, 0.0, sigma, &dsmax, &icnt);
@@ -767,10 +771,5 @@ void tspss(int n, double* x, double* y, int per, int unifrm, double* w, double s
     }
 
     // This is a simplified stub, a full translation is complex
-    for(int i=0; i<n; ++i) {
-        ys[i] = y[i] - 0.1; // Simulate some smoothing
-        yp[i] = 0;
-    }
-    *nit = 0;
-    *ier = 0;
+    *ier = -99; // Not implemented
 }
