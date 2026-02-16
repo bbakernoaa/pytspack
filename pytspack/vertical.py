@@ -1,14 +1,18 @@
 import xarray as xr
 import numpy as np
 import datetime
-from typing import Union
+from typing import Union, List
 from .pytspack import TsPack
 
+# Reuse a single TsPack instance for all calls to avoid initialization overhead
+_TSPACK_INSTANCE = TsPack()
 
-def _tspack_interp1d(y, x, x_new, tension):
+
+def _tspack_interp1d(
+    y: np.ndarray, x: np.ndarray, x_new: np.ndarray, tension: float
+) -> np.ndarray:
     """
     Internal wrapper for 1D interpolation using TsPack.
-    Designed for use with xarray.apply_ufunc.
 
     Parameters
     ----------
@@ -24,7 +28,7 @@ def _tspack_interp1d(y, x, x_new, tension):
     Returns
     -------
     np.ndarray
-        Interpolated values.
+        Interpolated values at x_new.
     """
     # TsPack requires strictly increasing x.
     # Vertical coordinates like pressure often decrease with index.
@@ -41,31 +45,31 @@ def _tspack_interp1d(y, x, x_new, tension):
         return np.full(len(x_new), np.nan)
 
     try:
-        tsp = TsPack()
-        # Create interpolator
-        predict = tsp.interpolate(x_sorted, y_sorted, tension=tension)
+        # Use the shared instance
+        predict = _TSPACK_INSTANCE.interpolate(x_sorted, y_sorted, tension=tension)
         return predict(x_new)
     except Exception:
-        # Fallback for errors in interpolation (e.g. non-increasing x)
+        # Fallback for errors in interpolation
         return np.full(len(x_new), np.nan)
 
 
 def interpolate_vertical(
     data: Union[xr.DataArray, xr.Dataset],
-    target_levels: Union[np.ndarray, list],
+    target_levels: Union[np.ndarray, List[float]],
     level_dim: str = "level",
     tension: float = 0.0,
 ) -> Union[xr.DataArray, xr.Dataset]:
     """
-    Interpolates data to new vertical levels using tension splines (TSPACK).
+    Interpolate data to new vertical levels using tension splines (TSPACK).
 
-    This function is Dask-aware and operates lazily.
+    Architected for the Pangeo ecosystem: backend-agnostic, supports Dask lazily,
+    and maintains scientific provenance.
 
     Parameters
     ----------
-    data : Union[xr.DataArray, xr.Dataset]
+    data : xr.DataArray or xr.Dataset
         The input data containing a vertical dimension to be interpolated.
-    target_levels : Union[np.ndarray, list]
+    target_levels : array-like
         A 1D array or list of the target vertical level values.
     level_dim : str, optional
         The name of the vertical dimension in the input data, by default "level".
@@ -76,8 +80,18 @@ def interpolate_vertical(
 
     Returns
     -------
-    Union[xr.DataArray, xr.Dataset]
+    xr.DataArray or xr.Dataset
         A new xarray object with the data interpolated to the target levels.
+
+    Examples
+    --------
+    >>> import xarray as xr
+    >>> import numpy as np
+    >>> from pytspack import interpolate_vertical
+    >>> levels = np.array([1000, 850, 700, 500])
+    >>> data = xr.DataArray(np.random.rand(4), coords=[levels], dims=["level"])
+    >>> target = [925, 600]
+    >>> interp = interpolate_vertical(data, target)
     """
     if isinstance(data, xr.Dataset):
         new_ds = xr.Dataset(attrs=data.attrs)
@@ -96,28 +110,36 @@ def interpolate_vertical(
     if level_dim not in data.dims:
         raise ValueError(f"Dimension '{level_dim}' not found in DataArray.")
 
-    target_levels = np.asarray(target_levels)
+    # Determine target levels as an array for metadata/coords
+    # We do NOT call .values or .compute() on the core data
+    if isinstance(target_levels, xr.DataArray):
+        target_levels_out = target_levels.data
+    else:
+        target_levels_out = np.asarray(target_levels)
 
     dask_kwargs = {}
-    if data.chunks is not None:
-        dask_kwargs["output_sizes"] = {"new_level": len(target_levels)}
+    if hasattr(data, "chunks") and data.chunks is not None:
+        dask_kwargs["output_sizes"] = {"new_level": len(target_levels_out)}
 
+    # Backend-agnostic computation using apply_ufunc
+    # Note: target_levels is passed as an input to avoid hidden computes
     interpolated_data = xr.apply_ufunc(
         _tspack_interp1d,
         data,
         data[level_dim],
-        input_core_dims=[[level_dim], [level_dim]],
+        target_levels,
+        input_core_dims=[[level_dim], [level_dim], ["new_level"]],
         output_core_dims=[["new_level"]],
         exclude_dims={level_dim},
         dask="parallelized",
         output_dtypes=[np.float64],
         dask_gufunc_kwargs=dask_kwargs,
         vectorize=True,
-        kwargs={"x_new": target_levels, "tension": tension},
+        kwargs={"tension": tension},
     )
 
     result = interpolated_data.rename({"new_level": level_dim})
-    result = result.assign_coords({level_dim: target_levels})
+    result = result.assign_coords({level_dim: target_levels_out})
 
     # Preserve original dimension order
     original_dims = list(data.dims)
@@ -125,11 +147,11 @@ def interpolate_vertical(
     new_dims.insert(data.dims.index(level_dim), level_dim)
     result = result.transpose(*new_dims)
 
-    # Provenance
+    # Provenance: Scientific Hygiene
     timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
     history_log = (
         f"{timestamp}: Vertically interpolated from '{level_dim}' "
-        f"to {len(target_levels)} levels using pytspack tension spline (tension={tension})."
+        f"to {len(target_levels_out)} levels using pytspack tension spline (tension={tension})."
     )
     if "history" in data.attrs:
         history_log = f"{data.attrs['history']}\n{history_log}"
