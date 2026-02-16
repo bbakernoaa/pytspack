@@ -29,6 +29,33 @@ c_double_p = np.ctypeslib.ndpointer(dtype=np.float64, flags="C_CONTIGUOUS")
 c_int_p = np.ctypeslib.ndpointer(dtype=np.int32, flags="C_CONTIGUOUS")
 
 
+# Define argument and return types for C functions once at module level
+if _lib:
+    try:
+        _lib.ypc1.argtypes = [
+            c_int,
+            c_double_p,
+            c_double_p,
+            c_double_p,
+            POINTER(c_int),
+        ]
+        _lib.tsval1.argtypes = [
+            c_int,
+            c_double_p,
+            c_double_p,
+            c_double_p,
+            c_double_p,
+            c_int,
+            c_int,
+            c_double_p,
+            c_double_p,
+            POINTER(c_int),
+        ]
+    except AttributeError:
+        # This might happen during build/install if the lib is not fully linked yet
+        pass
+
+
 class TsPack:
     """
     Python wrapper for the TSPACK (Tension Spline Curve Fitting Package) library.
@@ -39,27 +66,9 @@ class TsPack:
     """
 
     def __init__(self):
-        try:
-            _lib.ypc1.argtypes = [
-                c_int,
-                c_double_p,
-                c_double_p,
-                c_double_p,
-                POINTER(c_int),
-            ]
-            _lib.tsval1.argtypes = [
-                c_int,
-                c_double_p,
-                c_double_p,
-                c_double_p,
-                c_double_p,
-                c_int,
-                c_int,
-                c_double_p,
-                c_double_p,
-                POINTER(c_int),
-            ]
-        except AttributeError:
+        if not _lib:
+            raise RuntimeError("TSPACK library not loaded.")
+        if not hasattr(_lib, "ypc1") or not hasattr(_lib, "tsval1"):
             raise RuntimeError("TSPACK symbols missing in the library.")
 
     def interpolate(self, x, y, tension=0.0):
