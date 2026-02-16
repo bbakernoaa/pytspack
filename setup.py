@@ -3,9 +3,10 @@ import numpy
 import os
 
 # Define compiler flags
-extra_args = ["-std=c99", "-O3"]
-if os.name != "nt":
-    extra_args.append("-fPIC")
+if os.name == "nt":
+    extra_args = ["/O2"]
+else:
+    extra_args = ["-std=c99", "-O3", "-fPIC"]
 
 libpytspack = Extension(
     name="pytspack._libpytspack",

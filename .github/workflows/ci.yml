@@ -8,9 +8,11 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
@@ -34,7 +36,6 @@ jobs:
       run: |
         python setup.py build_ext --inplace
 
-    - name: Test with unittest
+    - name: Test with pytest
       run: |
-        export PYTHONPATH=$PYTHONPATH:.
         python -m pytest
