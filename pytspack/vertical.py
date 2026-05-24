@@ -88,6 +88,8 @@ def interpolate_vertical(
     -------
     Union[xr.DataArray, xr.Dataset]
         A new xarray object with the data interpolated to the target levels.
+        If interpolation fails for a profile (e.g. due to NaNs or non-monotonic
+        coordinates), the resulting profile will be filled with NaNs.
     """
     if isinstance(data, xr.Dataset):
         new_ds = xr.Dataset(attrs=data.attrs)
