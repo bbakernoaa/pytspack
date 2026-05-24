@@ -28,16 +28,26 @@ def _tspack_interp1d(y, x, x_new, tension):
     """
     # TsPack requires strictly increasing x.
     # Vertical coordinates like pressure often decrease with index.
-    if x[1] < x[0]:
+    # Check if x is strictly increasing.
+    dx = np.diff(x)
+    if np.all(dx > 0):
+        x_sorted = x
+        y_sorted = y
+    elif np.all(dx < 0):
+        x_sorted = x[::-1]
+        y_sorted = y[::-1]
+    else:
+        # Sort if not monotonic
         idx = np.argsort(x)
         x_sorted = x[idx]
         y_sorted = y[idx]
-    else:
-        x_sorted = x
-        y_sorted = y
 
-    # Check for NaNs which TsPack cannot handle
-    if np.any(np.isnan(y_sorted)) or np.any(np.isnan(x_sorted)):
+    # Check for NaNs or non-strictly increasing x which TsPack cannot handle
+    if (
+        np.any(np.isnan(y_sorted))
+        or np.any(np.isnan(x_sorted))
+        or np.any(np.diff(x_sorted) <= 0)
+    ):
         return np.full(len(x_new), np.nan)
 
     try:
@@ -45,7 +55,7 @@ def _tspack_interp1d(y, x, x_new, tension):
         # Create interpolator
         predict = tsp.interpolate(x_sorted, y_sorted, tension=tension)
         return predict(x_new)
-    except Exception:
+    except ValueError:
         # Fallback for errors in interpolation (e.g. non-increasing x)
         return np.full(len(x_new), np.nan)
 
@@ -59,7 +69,7 @@ def interpolate_vertical(
     """
     Interpolates data to new vertical levels using tension splines (TSPACK).
 
-    This function is Dask-aware and operates lazily.
+    This function is Dask-aware and operates lazily if the input data uses Dask.
 
     Parameters
     ----------
@@ -78,6 +88,12 @@ def interpolate_vertical(
     -------
     Union[xr.DataArray, xr.Dataset]
         A new xarray object with the data interpolated to the target levels.
+        Attributes, including a 'history' log, are preserved or updated.
+
+    Raises
+    ------
+    ValueError
+        If `level_dim` is not found in the input data.
     """
     if isinstance(data, xr.Dataset):
         new_ds = xr.Dataset(attrs=data.attrs)

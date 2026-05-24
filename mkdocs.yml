@@ -1,6 +1,10 @@
 site_name: pytspack
 theme:
   name: material
+nav:
+  - Home: index.md
+  - Usage: usage.md
+  - API Reference: api.md
 plugins:
   - search
   - mkdocstrings:

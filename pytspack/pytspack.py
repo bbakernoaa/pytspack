@@ -75,16 +75,39 @@ class TsPack:
         tension : float or array-like, optional
             The tension factor(s) for the spline. A value of 0 results in a
             standard cubic spline. Higher values make the curve 'tighter'.
+            If an array, it must have the same length as `x`.
             Default is 0.0.
 
         Returns
         -------
         callable
-            A function that can be used to evaluate the spline at new points.
+            A function `predict(t)` that evaluates the spline at new points `t`.
+            `t` can be a scalar or an array-like object.
+
+        Raises
+        ------
+        ValueError
+            If `x` and `y` have different lengths, if `x` is not strictly increasing,
+            or if `tension` is an array with a different length than `x`.
         """
         x = np.ascontiguousarray(x, dtype=np.float64)
         y = np.ascontiguousarray(y, dtype=np.float64)
+
+        if x.ndim != 1 or y.ndim != 1:
+            raise ValueError("x and y must be 1D arrays.")
+
         n = len(x)
+        if len(y) != n:
+            raise ValueError(
+                f"x and y must have the same length (got {n} and {len(y)})."
+            )
+
+        if n < 2:
+            raise ValueError("x and y must have at least 2 points.")
+
+        if np.any(np.diff(x) <= 0):
+            raise ValueError("x must be strictly increasing.")
+
         yp = np.zeros(n, dtype=np.float64)
         ier = c_int()
 
@@ -96,14 +119,33 @@ class TsPack:
             sigma = np.full(n, tension, dtype=np.float64)
         else:
             sigma = np.ascontiguousarray(tension, dtype=np.float64)
+            if len(sigma) != n:
+                raise ValueError(
+                    f"tension array must have the same length as x ({n}), "
+                    f"but got {len(sigma)}."
+                )
 
         def predict(t):
-            t = np.ascontiguousarray(t, dtype=np.float64)
-            res = np.zeros(len(t), dtype=np.float64)
+            """
+            Evaluates the tension spline at point(s) `t`.
+
+            Parameters
+            ----------
+            t : float or array-like
+                The point(s) at which to evaluate the spline.
+
+            Returns
+            -------
+            float or np.ndarray
+                The interpolated value(s) at `t`.
+            """
+            is_scalar = np.isscalar(t)
+            t_arr = np.atleast_1d(np.ascontiguousarray(t, dtype=np.float64))
+            res = np.zeros(len(t_arr), dtype=np.float64)
             ier = c_int()
-            _lib.tsval1(n, x, y, yp, sigma, 0, len(t), t, res, byref(ier))
+            _lib.tsval1(n, x, y, yp, sigma, 0, len(t_arr), t_arr, res, byref(ier))
             if ier.value < 0:
                 raise ValueError(f"TSPACK Error (tsval1): {ier.value}")
-            return res
+            return res[0] if is_scalar else res
 
         return predict
