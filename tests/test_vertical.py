@@ -82,3 +82,43 @@ def test_interpolate_vertical_dataset():
     assert result.temperature.shape == (2,)
     assert result.static_var.shape == (3,)
     assert "level" in result.temperature.coords
+
+
+def test_interpolate_vertical_nan_handling():
+    # Test with NaNs in data
+    levels = np.array([300.0, 500.0, 700.0])
+    data = np.array([230.0, np.nan, 268.0])
+    da_src = xr.DataArray(data, coords=[levels], dims=["level"])
+
+    target_levels = np.array([400.0, 600.0])
+    result = interpolate_vertical(da_src, target_levels)
+
+    assert np.all(np.isnan(result.values))
+
+
+def test_interpolate_vertical_unsorted_levels():
+    # Test with unsorted levels
+    levels = np.array([500.0, 300.0, 700.0])
+    data = np.array([255.0, 230.0, 268.0])
+    da_src = xr.DataArray(data, coords=[levels], dims=["level"])
+
+    target_levels = np.array([400.0, 600.0])
+    result = interpolate_vertical(da_src, target_levels)
+
+    assert result.shape == (2,)
+    assert not np.any(np.isnan(result.values))
+    assert 230 < result.values[0] < 255
+    assert 255 < result.values[1] < 268
+
+
+def test_interpolate_vertical_duplicate_levels():
+    # Test with duplicate levels (should result in NaNs or handled gracefully)
+    levels = np.array([300.0, 300.0, 700.0])
+    data = np.array([230.0, 230.0, 268.0])
+    da_src = xr.DataArray(data, coords=[levels], dims=["level"])
+
+    target_levels = np.array([400.0, 600.0])
+    result = interpolate_vertical(da_src, target_levels)
+
+    # _tspack_interp1d should return NaNs because np.diff(x_sorted) <= 0
+    assert np.all(np.isnan(result.values))

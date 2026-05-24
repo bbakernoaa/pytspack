@@ -28,16 +28,26 @@ def _tspack_interp1d(y, x, x_new, tension):
     """
     # TsPack requires strictly increasing x.
     # Vertical coordinates like pressure often decrease with index.
-    if x[1] < x[0]:
+    # Check if x is strictly increasing.
+    dx = np.diff(x)
+    if np.all(dx > 0):
+        x_sorted = x
+        y_sorted = y
+    elif np.all(dx < 0):
+        x_sorted = x[::-1]
+        y_sorted = y[::-1]
+    else:
+        # Sort if not monotonic
         idx = np.argsort(x)
         x_sorted = x[idx]
         y_sorted = y[idx]
-    else:
-        x_sorted = x
-        y_sorted = y
 
-    # Check for NaNs which TsPack cannot handle
-    if np.any(np.isnan(y_sorted)) or np.any(np.isnan(x_sorted)):
+    # Check for NaNs or non-strictly increasing x which TsPack cannot handle
+    if (
+        np.any(np.isnan(y_sorted))
+        or np.any(np.isnan(x_sorted))
+        or np.any(np.diff(x_sorted) <= 0)
+    ):
         return np.full(len(x_new), np.nan)
 
     try:

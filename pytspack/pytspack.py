@@ -84,7 +84,17 @@ class TsPack:
         """
         x = np.ascontiguousarray(x, dtype=np.float64)
         y = np.ascontiguousarray(y, dtype=np.float64)
+
+        if x.ndim != 1 or y.ndim != 1:
+            raise ValueError("x and y must be 1D arrays.")
+
         n = len(x)
+        if n < 2:
+            raise ValueError("x and y must have at least 2 points.")
+
+        if np.any(np.diff(x) <= 0):
+            raise ValueError("x must be strictly increasing.")
+
         yp = np.zeros(n, dtype=np.float64)
         ier = c_int()
 
@@ -98,12 +108,13 @@ class TsPack:
             sigma = np.ascontiguousarray(tension, dtype=np.float64)
 
         def predict(t):
-            t = np.ascontiguousarray(t, dtype=np.float64)
-            res = np.zeros(len(t), dtype=np.float64)
+            is_scalar = np.isscalar(t)
+            t_arr = np.atleast_1d(np.ascontiguousarray(t, dtype=np.float64))
+            res = np.zeros(len(t_arr), dtype=np.float64)
             ier = c_int()
-            _lib.tsval1(n, x, y, yp, sigma, 0, len(t), t, res, byref(ier))
+            _lib.tsval1(n, x, y, yp, sigma, 0, len(t_arr), t_arr, res, byref(ier))
             if ier.value < 0:
                 raise ValueError(f"TSPACK Error (tsval1): {ier.value}")
-            return res
+            return res[0] if is_scalar else res
 
         return predict
