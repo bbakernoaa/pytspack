@@ -27,3 +27,6 @@ test = [
     "pytest-benchmark",
     "ruff",
 ]
+examples = [
+    "matplotlib",
+]

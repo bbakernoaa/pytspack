@@ -69,18 +69,27 @@ class TsPack:
         Parameters
         ----------
         x : array-like
-            The x-coordinates of the data points. Must be strictly increasing.
+            The x-coordinates of the data points. Must be 1D and strictly increasing.
         y : array-like
-            The y-coordinates of the data points.
+            The y-coordinates of the data points. Must be 1D and the same length as x.
         tension : float or array-like, optional
             The tension factor(s) for the spline. A value of 0 results in a
             standard cubic spline. Higher values make the curve 'tighter'.
+            If an array, it must have the same length as x.
             Default is 0.0.
 
         Returns
         -------
         callable
-            A function that can be used to evaluate the spline at new points.
+            A function `predict(t)` that evaluates the spline at points `t`.
+            `t` can be a scalar or an N-dimensional array.
+            Returns a scalar or an array of the same shape as `t`.
+
+        Raises
+        ------
+        ValueError
+            If x and y dimensions are incorrect, x is not strictly increasing,
+            or TSPACK returns an error.
         """
         x = np.ascontiguousarray(x, dtype=np.float64)
         y = np.ascontiguousarray(y, dtype=np.float64)
@@ -106,15 +115,26 @@ class TsPack:
             sigma = np.full(n, tension, dtype=np.float64)
         else:
             sigma = np.ascontiguousarray(tension, dtype=np.float64)
+            if len(sigma) != n:
+                raise ValueError(
+                    f"tension array length ({len(sigma)}) must match x length ({n})."
+                )
 
         def predict(t):
             is_scalar = np.isscalar(t)
-            t_arr = np.atleast_1d(np.ascontiguousarray(t, dtype=np.float64))
-            res = np.zeros(len(t_arr), dtype=np.float64)
+            t_arr = np.ascontiguousarray(t, dtype=np.float64)
+            input_shape = t_arr.shape
+            t_flat = t_arr.ravel()
+
+            res = np.zeros(len(t_flat), dtype=np.float64)
             ier = c_int()
-            _lib.tsval1(n, x, y, yp, sigma, 0, len(t_arr), t_arr, res, byref(ier))
+            _lib.tsval1(n, x, y, yp, sigma, 0, len(t_flat), t_flat, res, byref(ier))
             if ier.value < 0:
                 raise ValueError(f"TSPACK Error (tsval1): {ier.value}")
-            return res[0] if is_scalar else res
+
+            if is_scalar:
+                return res[0]
+            else:
+                return res.reshape(input_shape)
 
         return predict

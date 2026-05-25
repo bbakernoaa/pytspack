@@ -60,3 +60,36 @@ def test_tspack_errors():
         assert False, "Should have raised ValueError"
     except ValueError as e:
         assert "1D arrays" in str(e)
+
+
+def test_tspack_multidim_input():
+    """Test that predict handles multidimensional input shapes correctly."""
+    x = np.array([0.0, 1.0, 2.0])
+    y = np.array([0.0, 1.0, 0.0])
+    tspack = TsPack()
+    interpolator = tspack.interpolate(x, y)
+
+    # 2D input
+    t2d = np.array([[0.5, 1.5], [0.1, 1.9]])
+    res2d = interpolator(t2d)
+    assert res2d.shape == (2, 2)
+    assert np.all(res2d > 0)
+
+    # 3D input
+    t3d = np.random.uniform(0, 2, size=(2, 3, 4))
+    res3d = interpolator(t3d)
+    assert res3d.shape == (2, 3, 4)
+
+
+def test_tspss_not_implemented():
+    """Test that tspss raises an error because it's currently a stub."""
+    from pytspack import _libpytspack
+
+    x = np.array([0.0, 1.0, 2.0])
+    y = np.array([0.0, 1.0, 0.0])
+    w = np.array([1.0, 1.0, 1.0])
+    try:
+        _libpytspack.tspss(x, y, 0, 0, w, 1.0, 0.01)
+        assert False, "Should have raised RuntimeError"
+    except RuntimeError as e:
+        assert "tspss failed with error code -99" in str(e)

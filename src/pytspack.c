@@ -296,7 +296,12 @@ static PyObject* py_tspss(PyObject* self, PyObject* args) {
 
     int lwk = 6 * n;
     double* wk = (double*)malloc(lwk * sizeof(double));
-    if (!wk) return PyErr_NoMemory();
+    if (!wk) {
+        Py_DECREF(x_arr);
+        Py_DECREF(y_arr);
+        Py_DECREF(w_arr);
+        return PyErr_NoMemory();
+    }
 
     npy_intp dims[1] = {n};
     PyArrayObject* sigma_arr = (PyArrayObject*)PyArray_SimpleNew(1, dims, NPY_DOUBLE);
@@ -305,7 +310,7 @@ static PyObject* py_tspss(PyObject* self, PyObject* args) {
 
     if (!sigma_arr || !ys_arr || !yp_arr) {
         free(wk);
-        Py_XDECREF(x_arr); Py_XDECREF(y_arr); Py_XDECREF(w_arr);
+        Py_DECREF(x_arr); Py_DECREF(y_arr); Py_DECREF(w_arr);
         Py_XDECREF(sigma_arr); Py_XDECREF(ys_arr); Py_XDECREF(yp_arr);
         return NULL;
     }

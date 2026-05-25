@@ -18,10 +18,16 @@ This command compiles the C extension and installs the `pytspack` package into y
 
 ### Editable Mode
 
-For development, install the package in editable mode:
+For development, install the package in editable mode with test dependencies:
 
 ```bash
-pip install -e .
+pip install -e .[test]
+```
+
+To run the examples, you might need `matplotlib`:
+
+```bash
+pip install .[examples]
 ```
 
 ## Usage
