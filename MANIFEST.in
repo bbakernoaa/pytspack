@@ -2,3 +2,6 @@ include src/*.h
 include src/*.c
 include LICENSE
 include README.md
+include mkdocs.yml
+recursive-include examples *.py
+recursive-include docs *.md

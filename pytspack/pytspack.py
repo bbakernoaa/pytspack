@@ -115,6 +115,10 @@ class TsPack:
             sigma = np.full(n, tension, dtype=np.float64)
         else:
             sigma = np.ascontiguousarray(tension, dtype=np.float64)
+            if len(sigma) != n:
+                raise ValueError(
+                    f"tension array length ({len(sigma)}) must match x length ({n})."
+                )
 
         def predict(t):
             is_scalar = np.isscalar(t)
